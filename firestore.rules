@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() { return request.auth != null; }
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isCashier() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cashier';
+    }
+
+    match /products/{id} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+    match /users/{id} {
+      allow read, write: if isAdmin();
+      allow read: if request.auth.uid == id;
+    }
+    match /sessions/{id} {
+      allow read:  if isCashier() || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /orders/{id} {
+      allow read, write: if isCashier() || isAdmin();
+    }
+    match /orders/{id}/items/{itemId} {
+      allow read, write: if isCashier() || isAdmin();
+    }
+    match /orders/{id}/payments/{payId} {
+      allow read, write: if isCashier() || isAdmin();
+    }
+  }
+}
