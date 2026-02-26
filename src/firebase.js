@@ -6,14 +6,15 @@ import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAHjMaLrQbF8uV8bj2aT1kKDmQbEiBfNDM",
-    authDomain: "tucanapp-pos.firebaseapp.com",
-    projectId: "tucanapp-pos",
-    storageBucket: "tucanapp-pos.firebasestorage.app",
-    messagingSenderId: "833846886165",
-    appId: "1:833846886165:web:28746819de42fbddd1331c",
-    measurementId: "G-SF5LVN3XWX",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
+
 
 const app = initializeApp(firebaseConfig)
 
