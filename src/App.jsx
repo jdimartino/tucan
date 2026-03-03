@@ -8,12 +8,14 @@ import POSPage from './pages/POSPage'
 import TicketPage from './pages/TicketPage'
 import SuccessPage from './pages/SuccessPage'
 import AdminPage from './pages/AdminPage'
+import HoldPage from './pages/HoldPage'
 
 // Router interno del cajero (pos → ticket → success)
 function CashierRouter() {
   const { screen } = useNav()
   if (screen === 'ticket') return <TicketPage />
   if (screen === 'success') return <SuccessPage />
+  if (screen === 'hold') return <HoldPage />
   return <POSPage />
 }
 
@@ -51,11 +53,10 @@ function AppRouter() {
 // El admin puede cambiar entre su panel y el POS
 function AdminOrPOS() {
   const { screen } = useNav()
-  // Si el screen es 'ticket' o 'success', renderiza esas pantallas
   if (screen === 'ticket') return <TicketPage />
   if (screen === 'success') return <SuccessPage />
   if (screen === 'pos') return <POSPage />
-  // Por defecto, panel admin
+  if (screen === 'hold') return <HoldPage />
   return <AdminPage />
 }
 

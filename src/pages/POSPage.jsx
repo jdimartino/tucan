@@ -82,8 +82,8 @@ export default function POSPage() {
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
                             className={`whitespace-nowrap text-xs font-bold px-4 py-2 rounded-full transition-all flex-shrink-0 ${activeCategory === cat
-                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                                    : 'bg-[#1E293B] text-slate-400 hover:text-white border border-white/5'
+                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                                : 'bg-[#1E293B] text-slate-400 hover:text-white border border-white/5'
                                 }`}
                         >
                             {cat}
@@ -126,16 +126,40 @@ export default function POSPage() {
             {/* ── Cart Bar flotante inferior ── */}
             {itemCount > 0 && (
                 <div className="fixed bottom-0 left-0 right-0 z-20 p-4">
-                    <button
-                        onClick={() => setScreen('ticket')}
-                        className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-2xl shadow-blue-600/40 flex items-center justify-between"
-                    >
-                        <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                            {itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}
-                        </span>
-                        <span>Ver Ticket →</span>
-                        <span className="font-extrabold">{formatUSD(totalCents)}</span>
-                    </button>
+                    <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-3 shadow-2xl flex flex-col gap-2">
+
+                        {/* Info: ítems + emojis + total */}
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-white font-extrabold text-lg leading-none">{formatUSD(totalCents)}</span>
+                            <span className="text-slate-400 text-xs">{itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}</span>
+                        </div>
+
+                        {/* Emojis + nombres horizontales */}
+                        <div className="w-full flex items-center justify-start gap-2 overflow-x-auto pb-1 scrollbar-none opacity-80">
+                            {items.map(item => (
+                                <span key={item.productId} className="text-[10px] font-medium bg-white/5 border border-white/10 px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0 flex items-center gap-1 text-slate-300">
+                                    <span>{item.emoji}</span>
+                                    <span>{item.qty}x {item.name}</span>
+                                </span>
+                            ))}
+                        </div>
+
+                        {/* Botones de acción */}
+                        <div className="flex gap-2 mt-1">
+                            <button
+                                onClick={() => setScreen('hold')}
+                                className="flex-1 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 active:scale-[0.98] text-amber-400 font-bold py-3 px-3 rounded-xl transition-all text-sm"
+                            >
+                                ⏳ En Espera
+                            </button>
+                            <button
+                                onClick={() => setScreen('ticket')}
+                                className="flex-[2] bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-extrabold py-3 px-5 rounded-xl transition-all shadow-lg shadow-blue-600/30 text-sm"
+                            >
+                                💳 Cobrar {formatUSD(totalCents)}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

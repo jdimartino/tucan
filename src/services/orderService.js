@@ -1,6 +1,7 @@
 // src/services/orderService.js
 import {
-    collection, addDoc, doc, setDoc, serverTimestamp,
+    collection, addDoc, doc, setDoc, updateDoc,
+    serverTimestamp, query, where, getDocs, getDoc,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 
@@ -38,4 +39,73 @@ export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, p
     })
 
     return orderRef.id
+}
+
+/**
+ * Guarda una Factura en Espera (cuenta abierta) en Firestore.
+ * mode: 'tab' / status: 'open'
+ */
+export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, items, client }) {
+    const orderRef = await addDoc(collection(db, 'orders'), {
+        cashierId,
+        sessionId,
+        rateAtTime: exchangeRateBs,
+        status: 'open',
+        mode: 'tab',
+        client: { name: client.name.trim(), phone: client.phone.trim() },
+        totalCents: items.reduce((s, i) => s + i.subtotalCents, 0),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    })
+
+    for (const item of items) {
+        await setDoc(doc(db, 'orders', orderRef.id, 'items', item.productId), {
+            name: item.name,
+            emoji: item.emoji,
+            qty: item.qty,
+            unitPriceCents: item.unitPriceCents,
+            subtotalCents: item.subtotalCents,
+        })
+    }
+
+    return orderRef.id
+}
+
+/**
+ * Obtiene las órdenes abiertas (status: 'open') de una sesión.
+ */
+export async function getOpenOrders(sessionId) {
+    const q = query(
+        collection(db, 'orders'),
+        where('sessionId', '==', sessionId),
+        where('status', '==', 'open')
+    )
+    const snap = await getDocs(q)
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+/**
+ * Retoma una orden en espera:
+ * 1. Marca la orden como 'processing'
+ * 2. Lee los ítems de la subcol y los devuelve para cargarlos en el carrito
+ */
+export async function reopenOrder(orderId) {
+    // 1. Marcar como processing para evitar doble retoma
+    await updateDoc(doc(db, 'orders', orderId), {
+        status: 'processing',
+        updatedAt: serverTimestamp(),
+    })
+    // 2. Leer items
+    const itemsSnap = await getDocs(collection(db, 'orders', orderId, 'items'))
+    return itemsSnap.docs.map(d => ({ productId: d.id, ...d.data() }))
+}
+
+/**
+ * Cancela una orden en espera.
+ */
+export async function cancelHoldOrder(orderId) {
+    return updateDoc(doc(db, 'orders', orderId), {
+        status: 'cancelled',
+        updatedAt: serverTimestamp(),
+    })
 }
