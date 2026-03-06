@@ -109,3 +109,44 @@ export async function cancelHoldOrder(orderId) {
         updatedAt: serverTimestamp(),
     })
 }
+
+/**
+ * Anexa ítems a una cuenta en espera existente.
+ */
+export async function appendHoldOrder(orderId, items) {
+    // 1. Obtener la orden actual para actualizar el total
+    const orderRef = doc(db, 'orders', orderId)
+    const orderSnap = await getDoc(orderRef)
+    if (!orderSnap.exists()) throw new Error('La orden no existe')
+
+    const currentTotal = orderSnap.data().totalCents || 0
+    const newItemsTotal = items.reduce((s, i) => s + i.subtotalCents, 0)
+
+    // 2. Actualizar el doc principal
+    await updateDoc(orderRef, {
+        totalCents: currentTotal + newItemsTotal,
+        updatedAt: serverTimestamp(),
+    })
+
+    // 3. Actualizar o crear los ítems en la subcolección
+    for (const item of items) {
+        const itemRef = doc(db, 'orders', orderId, 'items', item.productId)
+        const itemSnap = await getDoc(itemRef)
+
+        if (itemSnap.exists()) {
+            const data = itemSnap.data()
+            await updateDoc(itemRef, {
+                qty: data.qty + item.qty,
+                subtotalCents: data.subtotalCents + item.subtotalCents
+            })
+        } else {
+            await setDoc(itemRef, {
+                name: item.name,
+                emoji: item.emoji,
+                qty: item.qty,
+                unitPriceCents: item.unitPriceCents,
+                subtotalCents: item.subtotalCents,
+            })
+        }
+    }
+}

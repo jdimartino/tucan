@@ -5,7 +5,7 @@ import { useSession } from '../context/SessionContext'
 import { useAuth } from '../context/AuthContext'
 import { useNav } from '../context/NavigationContext'
 import { useOpenOrders } from '../hooks/useOpenOrders'
-import { saveHoldOrder, reopenOrder, cancelHoldOrder } from '../services/orderService'
+import { saveHoldOrder, reopenOrder, cancelHoldOrder, appendHoldOrder } from '../services/orderService'
 import { formatUSD, fromCents } from '../utils/money'
 
 export default function HoldPage() {
@@ -19,26 +19,36 @@ export default function HoldPage() {
     const [phone, setPhone] = useState('')
     const [saving, setSaving] = useState(false)
     const [retaking, setRetaking] = useState(null)
+    const [assignMode, setAssignMode] = useState('new')
+    const [selectedOrderId, setSelectedOrderId] = useState('')
 
     const rate = session?.exchangeRateBs || 1
     const hasItems = items.length > 0
 
-    const canSave = name.trim().length >= 2 && phone.trim().length >= 7 && hasItems && session?.id
+    const canSaveNew = name.trim().length >= 2 && phone.trim().length >= 7 && hasItems && session?.id
+    const canSaveExisting = selectedOrderId && hasItems && session?.id
+    const canSave = assignMode === 'new' || orders.length === 0 ? canSaveNew : canSaveExisting
 
     const handleSave = async () => {
         if (!canSave) return
         setSaving(true)
         try {
-            await saveHoldOrder({
-                cashierId: user.uid,
-                sessionId: session.id,
-                exchangeRateBs: rate,
-                items,
-                client: { name, phone },
-            })
+            if (assignMode === 'new' || orders.length === 0) {
+                await saveHoldOrder({
+                    cashierId: user.uid,
+                    sessionId: session.id,
+                    exchangeRateBs: rate,
+                    items,
+                    client: { name, phone },
+                })
+            } else {
+                await appendHoldOrder(selectedOrderId, items)
+            }
             dispatch({ type: 'CLEAR_CART' })
             setName('')
             setPhone('')
+            setSelectedOrderId('')
+            setAssignMode('new')
             // Permanece en HoldPage para ver la lista
         } catch (err) {
             console.error(err)
@@ -94,17 +104,17 @@ export default function HoldPage() {
         <div className="min-h-screen bg-[#0F172A] flex flex-col pb-8">
 
             {/* Header */}
-            <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-                <button
-                    onClick={() => setScreen('pos')}
-                    className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
-                >
-                    ←
-                </button>
+            <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div>
                     <p className="text-white font-bold text-sm leading-none">⏳ Factura en Espera</p>
-                    <p className="text-slate-500 text-[10px]">Guarda o retoma una cuenta abierta</p>
+                    <p className="text-slate-500 text-[10px] mt-0.5">Guarda o retoma una cuenta</p>
                 </div>
+                <button
+                    onClick={() => setScreen('pos')}
+                    className="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-blue-600/20"
+                >
+                    ← Volver a Facturación
+                </button>
             </header>
 
             <div className="flex-1 px-4 pt-4 space-y-5">
@@ -128,34 +138,72 @@ export default function HoldPage() {
                             ))}
                         </div>
 
-                        {/* Formulario de cliente */}
+                        {/* Opciones de asignación */}
+                        {orders.length > 0 && (
+                            <div className="flex gap-2 mb-4 bg-[#0F172A] p-1 rounded-xl border border-white/5">
+                                <button
+                                    onClick={() => setAssignMode('new')}
+                                    className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'new' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Nuevo Cliente
+                                </button>
+                                <button
+                                    onClick={() => setAssignMode('existing')}
+                                    className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'existing' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Anexar a Existente
+                                </button>
+                            </div>
+                        )}
+
                         <div className="space-y-3">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Nombre del Cliente</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
-                                    placeholder="ej. Jonathan"
-                                    className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Celular</label>
-                                <input
-                                    type="tel"
-                                    value={phone}
-                                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                                    placeholder="ej. 04121234567"
-                                    className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                />
-                            </div>
+                            {assignMode === 'new' || orders.length === 0 ? (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Nombre del Cliente</label>
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={e => setName(e.target.value)}
+                                            placeholder="ej. Jonathan"
+                                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Celular</label>
+                                        <input
+                                            type="tel"
+                                            value={phone}
+                                            onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                                            placeholder="ej. 04121234567"
+                                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Seleccionar Cuenta Abierta</label>
+                                    <select
+                                        value={selectedOrderId}
+                                        onChange={e => setSelectedOrderId(e.target.value)}
+                                        className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                    >
+                                        <option value="" disabled>-- Elige un cliente --</option>
+                                        {orders.map(o => (
+                                            <option key={o.id} value={o.id}>
+                                                {o.client?.name} (Lleva: {formatUSD(o.totalCents)})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             <button
                                 onClick={handleSave}
                                 disabled={!canSave || saving}
                                 className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-black font-extrabold py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none shadow-lg shadow-amber-500/20"
                             >
-                                {saving ? 'Guardando...' : '⏳ Dejar en Espera'}
+                                {saving ? 'Guardando...' : assignMode === 'existing' && orders.length > 0 ? '⏳ Anexar Pedido' : '⏳ Dejar en Espera'}
                             </button>
                         </div>
                     </div>

@@ -7,6 +7,7 @@ import { useSession } from '../context/SessionContext'
 import { useCart } from '../context/CartContext'
 import { useNav } from '../context/NavigationContext'
 import { useProducts } from '../hooks/useProducts'
+import { useOpenOrders } from '../hooks/useOpenOrders'
 import { formatUSD, formatBS } from '../utils/money'
 
 const ALL = 'Todos'
@@ -17,6 +18,8 @@ export default function POSPage() {
     const { items, totalCents, itemCount, dispatch } = useCart()
     const { setScreen } = useNav()
     const { products, loading } = useProducts()
+    const { orders: holdOrders } = useOpenOrders(session?.id)
+    const holdCount = holdOrders?.length || 0
     const [activeCategory, setActiveCategory] = useState(ALL)
 
     // Extraer categorías únicas de productos activos
@@ -52,6 +55,14 @@ export default function POSPage() {
                     <p className="text-slate-500 text-[10px] leading-none mt-0.5">{user?.email}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {holdCount > 0 && (
+                        <button
+                            onClick={() => setScreen('hold')}
+                            className="bg-amber-500/20 text-amber-400 text-[10px] sm:text-xs font-extrabold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full flex items-center gap-1 hover:bg-amber-500/30 transition-colors"
+                        >
+                            ⏳ <span className="hidden sm:inline">En espera:</span> {holdCount}
+                        </button>
+                    )}
                     {session?.exchangeRateBs && (
                         <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
                             Bs {session.exchangeRateBs}/$
@@ -159,6 +170,21 @@ export default function POSPage() {
                                 💳 Cobrar {formatUSD(totalCents)}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Alert flotante de Facturas en Espera (Solo si no hay carrito activo) ── */}
+            {itemCount === 0 && holdCount > 0 && (
+                <div className="fixed top-16 left-0 right-0 z-20 px-4 py-2 pointer-events-none">
+                    <div className="flex justify-end">
+                        <button
+                            onClick={() => setScreen('hold')}
+                            className="pointer-events-auto bg-amber-500 hover:bg-amber-400 text-[#0F172A] font-bold py-1.5 px-4 rounded-full shadow-lg transition-all flex items-center gap-1.5 active:scale-95 text-xs"
+                        >
+                            <span>⏳</span>
+                            <span>{holdCount} factura{holdCount !== 1 ? 's' : ''} en espera</span>
+                        </button>
                     </div>
                 </div>
             )}
