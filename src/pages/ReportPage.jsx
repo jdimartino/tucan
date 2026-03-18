@@ -5,10 +5,12 @@ import { useSalesReport } from '../hooks/useSalesReport'
 import { closeSession } from '../services/sessionService'
 import { formatUSD, fromCents } from '../utils/money'
 import { useState } from 'react'
+import { useToast } from '../components/Toast'
 
 export default function ReportPage({ onBack }) {
     const { session, setSession } = useSession()
     const { orders, loading, totalUSD, totalTx } = useSalesReport(session?.id)
+    const toast = useToast()
     const [closing, setClosing] = useState(false)
     const [confirm, setConfirm] = useState(false)
     const [closed, setClosed] = useState(false)
@@ -25,7 +27,7 @@ export default function ReportPage({ onBack }) {
     const METHOD_LABELS = {
         usd_cash: '💵 Efectivo USD',
         bs_cash: '💴 Efectivo BS',
-        transfer: '📲 Transferencia',
+        pago_movil: '📲 Pago Móvil',
         mixed: '🔀 Mixto',
         unknown: '❓ Sin método',
     }
@@ -34,11 +36,12 @@ export default function ReportPage({ onBack }) {
         setClosing(true)
         try {
             await closeSession(session.id, { totalUSD, totalTx })
-            setSession(null) // Limpiar sesión (localStorage también)
+            setSession(null)
             setClosed(true)
+            toast.success('Caja cerrada correctamente')
         } catch (err) {
             console.error(err)
-            alert('Error cerrando caja. Intenta de nuevo.')
+            toast.error('Error cerrando caja. Intenta de nuevo.')
         } finally {
             setClosing(false)
             setConfirm(false)
@@ -109,7 +112,7 @@ export default function ReportPage({ onBack }) {
                 <div>
                     <p className="label-xs mb-2">Órdenes del Día ({orders.length})</p>
                     <div className="space-y-2">
-                        {orders.map((o, i) => (
+                        {orders.map((o) => (
                             <div key={o.id} className="bg-[#1E293B] rounded-xl px-4 py-2.5 flex items-center justify-between border border-white/5">
                                 <div>
                                     <p className="text-white text-xs font-semibold font-mono">#{o.id.slice(0, 8)}</p>
@@ -135,7 +138,7 @@ export default function ReportPage({ onBack }) {
                     🏁 Cerrar Caja
                 </button>
             ) : (
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-5 space-y-3">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-5 space-y-3" role="dialog" aria-label="Confirmar cierre de caja">
                     <p className="text-orange-400 font-bold text-center text-sm">¿Confirmar cierre de caja?</p>
                     <p className="text-slate-400 text-xs text-center">Se registrará un total de <span className="text-white font-bold">{formatUSD(totalUSD * 100)}</span> en {totalTx} transacciones.</p>
                     <div className="flex gap-2">

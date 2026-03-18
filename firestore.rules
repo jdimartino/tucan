@@ -11,6 +11,9 @@ service cloud.firestore {
       return isAuth() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cashier';
     }
+    function isStaff() {
+      return isAdmin() || isCashier();
+    }
 
     match /products/{id} {
       allow read:  if isAuth();
@@ -21,17 +24,24 @@ service cloud.firestore {
       allow read: if request.auth.uid == id;
     }
     match /sessions/{id} {
-      allow read:  if isCashier() || isAdmin();
+      allow read:  if isStaff();
       allow write: if isAdmin();
     }
+    // Cashiers can only create orders with their own cashierId
     match /orders/{id} {
-      allow read, write: if isCashier() || isAdmin();
+      allow read: if isStaff();
+      allow create: if isStaff() && request.resource.data.cashierId == request.auth.uid;
+      allow update: if isStaff();
+      allow delete: if isAdmin();
     }
     match /orders/{id}/items/{itemId} {
-      allow read, write: if isCashier() || isAdmin();
+      allow read, write: if isStaff();
     }
     match /orders/{id}/payments/{payId} {
-      allow read, write: if isCashier() || isAdmin();
+      allow read, write: if isStaff();
+    }
+    match /counters/{id} {
+      allow read, write: if isStaff();
     }
   }
 }

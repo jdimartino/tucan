@@ -2,28 +2,48 @@
 import {
     collection, addDoc, doc, setDoc, updateDoc,
     serverTimestamp, query, where, getDocs, getDoc,
+    writeBatch, runTransaction,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 
 /**
- * Guarda una orden completa en Firestore.
+ * Reserva el siguiente número de factura usando un contador atómico.
+ * Colección: counters/invoices -> { current: N }
+ */
+export async function nextInvoiceNumber() {
+    const counterRef = doc(db, 'counters', 'invoices')
+    return runTransaction(db, async (tx) => {
+        const snap = await tx.get(counterRef)
+        const next = (snap.exists() ? snap.data().current : 0) + 1
+        tx.set(counterRef, { current: next }, { merge: true })
+        return next
+    })
+}
+
+/**
+ * Guarda una orden completa en Firestore usando writeBatch (atómica).
  * Estructura: orders/{id} + subcol items/{} + subcol payments/{}
  */
-export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, payment }) {
+export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, payment, invoiceNumber }) {
     // 1. Crear doc principal de la orden
-    const orderRef = await addDoc(collection(db, 'orders'), {
+    const orderRef = doc(collection(db, 'orders'))
+    const batch = writeBatch(db)
+
+    batch.set(orderRef, {
         cashierId,
         sessionId,
         rateAtTime: exchangeRateBs,
         status: 'paid',
         mode: 'fast',
         totalCents: items.reduce((s, i) => s + i.subtotalCents, 0),
+        ...(invoiceNumber != null && { invoiceNumber }),
         createdAt: serverTimestamp(),
     })
 
     // 2. Guardar cada ítem en subcol
     for (const item of items) {
-        await setDoc(doc(db, 'orders', orderRef.id, 'items', item.productId), {
+        const itemRef = doc(db, 'orders', orderRef.id, 'items', item.productId)
+        batch.set(itemRef, {
             name: item.name,
             emoji: item.emoji,
             qty: item.qty,
@@ -33,20 +53,25 @@ export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, p
     }
 
     // 3. Guardar el pago en subcol
-    await setDoc(doc(db, 'orders', orderRef.id, 'payments', 'p1'), {
+    const payRef = doc(db, 'orders', orderRef.id, 'payments', 'p1')
+    batch.set(payRef, {
         ...payment,
         createdAt: serverTimestamp(),
     })
 
+    await batch.commit()
     return orderRef.id
 }
 
 /**
- * Guarda una Factura en Espera (cuenta abierta) en Firestore.
+ * Guarda una Factura en Espera (cuenta abierta) en Firestore usando writeBatch.
  * mode: 'tab' / status: 'open'
  */
 export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, items, client }) {
-    const orderRef = await addDoc(collection(db, 'orders'), {
+    const orderRef = doc(collection(db, 'orders'))
+    const batch = writeBatch(db)
+
+    batch.set(orderRef, {
         cashierId,
         sessionId,
         rateAtTime: exchangeRateBs,
@@ -59,7 +84,8 @@ export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, item
     })
 
     for (const item of items) {
-        await setDoc(doc(db, 'orders', orderRef.id, 'items', item.productId), {
+        const itemRef = doc(db, 'orders', orderRef.id, 'items', item.productId)
+        batch.set(itemRef, {
             name: item.name,
             emoji: item.emoji,
             qty: item.qty,
@@ -68,6 +94,7 @@ export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, item
         })
     }
 
+    await batch.commit()
     return orderRef.id
 }
 
@@ -90,12 +117,10 @@ export async function getOpenOrders(sessionId) {
  * 2. Lee los ítems de la subcol y los devuelve para cargarlos en el carrito
  */
 export async function reopenOrder(orderId) {
-    // 1. Marcar como processing para evitar doble retoma
     await updateDoc(doc(db, 'orders', orderId), {
         status: 'processing',
         updatedAt: serverTimestamp(),
     })
-    // 2. Leer items
     const itemsSnap = await getDocs(collection(db, 'orders', orderId, 'items'))
     return itemsSnap.docs.map(d => ({ productId: d.id, ...d.data() }))
 }
@@ -111,42 +136,53 @@ export async function cancelHoldOrder(orderId) {
 }
 
 /**
- * Anexa ítems a una cuenta en espera existente.
+ * Anexa ítems a una cuenta en espera existente usando runTransaction (atómica).
  */
 export async function appendHoldOrder(orderId, items) {
-    // 1. Obtener la orden actual para actualizar el total
     const orderRef = doc(db, 'orders', orderId)
-    const orderSnap = await getDoc(orderRef)
-    if (!orderSnap.exists()) throw new Error('La orden no existe')
 
-    const currentTotal = orderSnap.data().totalCents || 0
-    const newItemsTotal = items.reduce((s, i) => s + i.subtotalCents, 0)
+    await runTransaction(db, async (transaction) => {
+        const orderSnap = await transaction.get(orderRef)
+        if (!orderSnap.exists()) throw new Error('La orden no existe')
 
-    // 2. Actualizar el doc principal
-    await updateDoc(orderRef, {
-        totalCents: currentTotal + newItemsTotal,
-        updatedAt: serverTimestamp(),
-    })
+        const currentTotal = orderSnap.data().totalCents || 0
+        const newItemsTotal = items.reduce((s, i) => s + i.subtotalCents, 0)
 
-    // 3. Actualizar o crear los ítems en la subcolección
-    for (const item of items) {
-        const itemRef = doc(db, 'orders', orderId, 'items', item.productId)
-        const itemSnap = await getDoc(itemRef)
-
-        if (itemSnap.exists()) {
-            const data = itemSnap.data()
-            await updateDoc(itemRef, {
-                qty: data.qty + item.qty,
-                subtotalCents: data.subtotalCents + item.subtotalCents
-            })
-        } else {
-            await setDoc(itemRef, {
-                name: item.name,
-                emoji: item.emoji,
-                qty: item.qty,
-                unitPriceCents: item.unitPriceCents,
-                subtotalCents: item.subtotalCents,
-            })
+        // Leer los ítems existentes dentro de la transacción
+        const existingItems = {}
+        for (const item of items) {
+            const itemRef = doc(db, 'orders', orderId, 'items', item.productId)
+            const itemSnap = await transaction.get(itemRef)
+            if (itemSnap.exists()) {
+                existingItems[item.productId] = itemSnap.data()
+            }
         }
-    }
+
+        // Actualizar el doc principal
+        transaction.update(orderRef, {
+            totalCents: currentTotal + newItemsTotal,
+            updatedAt: serverTimestamp(),
+        })
+
+        // Actualizar o crear los ítems en la subcolección
+        for (const item of items) {
+            const itemRef = doc(db, 'orders', orderId, 'items', item.productId)
+            const existing = existingItems[item.productId]
+
+            if (existing) {
+                transaction.update(itemRef, {
+                    qty: existing.qty + item.qty,
+                    subtotalCents: existing.subtotalCents + item.subtotalCents,
+                })
+            } else {
+                transaction.set(itemRef, {
+                    name: item.name,
+                    emoji: item.emoji,
+                    qty: item.qty,
+                    unitPriceCents: item.unitPriceCents,
+                    subtotalCents: item.subtotalCents,
+                })
+            }
+        }
+    })
 }

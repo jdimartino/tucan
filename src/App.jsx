@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { SessionProvider } from './context/SessionContext'
 import { CartProvider } from './context/CartContext'
 import { NavigationProvider, useNav } from './context/NavigationContext'
+import { ToastProvider } from './components/Toast'
+import ErrorBoundary from './components/ErrorBoundary'
 import LoginPage from './pages/LoginPage'
 import POSPage from './pages/POSPage'
 import TicketPage from './pages/TicketPage'
@@ -62,8 +64,12 @@ function AdminOrPOS() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRouter />
-    </AuthProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <AppRouter />
+        </AuthProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   )
 }

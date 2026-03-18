@@ -7,6 +7,7 @@ import { useNav } from '../context/NavigationContext'
 import { useOpenOrders } from '../hooks/useOpenOrders'
 import { saveHoldOrder, reopenOrder, cancelHoldOrder, appendHoldOrder } from '../services/orderService'
 import { formatUSD, fromCents } from '../utils/money'
+import { useToast } from '../components/Toast'
 
 export default function HoldPage() {
     const { items, totalCents, dispatch } = useCart()
@@ -14,6 +15,7 @@ export default function HoldPage() {
     const { user } = useAuth()
     const { setScreen } = useNav()
     const { orders, loading } = useOpenOrders(session?.id)
+    const toast = useToast()
 
     const [name, setName] = useState('')
     const [phone, setPhone] = useState('')
@@ -49,10 +51,10 @@ export default function HoldPage() {
             setPhone('')
             setSelectedOrderId('')
             setAssignMode('new')
-            // Permanece en HoldPage para ver la lista
+            toast.success('Cuenta guardada correctamente')
         } catch (err) {
             console.error(err)
-            alert('Error al guardar la cuenta. Intenta de nuevo.')
+            toast.error('Error al guardar la cuenta. Intenta de nuevo.')
         } finally {
             setSaving(false)
         }
@@ -79,7 +81,7 @@ export default function HoldPage() {
             setScreen('ticket')
         } catch (err) {
             console.error(err)
-            alert('Error al retomar la cuenta.')
+            toast.error('Error al retomar la cuenta.')
         } finally {
             setRetaking(null)
         }
@@ -89,8 +91,9 @@ export default function HoldPage() {
         if (!confirm('¿Cancelar esta cuenta en espera?')) return
         try {
             await cancelHoldOrder(orderId)
+            toast.success('Cuenta cancelada')
         } catch (err) {
-            alert('Error al cancelar la cuenta.')
+            toast.error('Error al cancelar la cuenta.')
         }
     }
 
@@ -111,6 +114,7 @@ export default function HoldPage() {
                 </div>
                 <button
                     onClick={() => setScreen('pos')}
+                    aria-label="Volver a facturación"
                     className="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-blue-600/20"
                 >
                     ← Volver a Facturación
@@ -140,14 +144,18 @@ export default function HoldPage() {
 
                         {/* Opciones de asignación */}
                         {orders.length > 0 && (
-                            <div className="flex gap-2 mb-4 bg-[#0F172A] p-1 rounded-xl border border-white/5">
+                            <div className="flex gap-2 mb-4 bg-[#0F172A] p-1 rounded-xl border border-white/5" role="tablist">
                                 <button
+                                    role="tab"
+                                    aria-selected={assignMode === 'new'}
                                     onClick={() => setAssignMode('new')}
                                     className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'new' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
                                 >
                                     Nuevo Cliente
                                 </button>
                                 <button
+                                    role="tab"
+                                    aria-selected={assignMode === 'existing'}
                                     onClick={() => setAssignMode('existing')}
                                     className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'existing' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
                                 >
@@ -160,8 +168,9 @@ export default function HoldPage() {
                             {assignMode === 'new' || orders.length === 0 ? (
                                 <>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Nombre del Cliente</label>
+                                        <label htmlFor="client-name" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Nombre del Cliente</label>
                                         <input
+                                            id="client-name"
                                             type="text"
                                             value={name}
                                             onChange={e => setName(e.target.value)}
@@ -170,8 +179,9 @@ export default function HoldPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Celular</label>
+                                        <label htmlFor="client-phone" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Celular</label>
                                         <input
+                                            id="client-phone"
                                             type="tel"
                                             value={phone}
                                             onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
@@ -182,8 +192,9 @@ export default function HoldPage() {
                                 </>
                             ) : (
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Seleccionar Cuenta Abierta</label>
+                                    <label htmlFor="select-order" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Seleccionar Cuenta Abierta</label>
                                     <select
+                                        id="select-order"
                                         value={selectedOrderId}
                                         onChange={e => setSelectedOrderId(e.target.value)}
                                         className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -263,6 +274,7 @@ export default function HoldPage() {
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => handleCancel(order.id)}
+                                    aria-label={`Cancelar cuenta de ${order.client?.name}`}
                                     className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-semibold py-2 rounded-xl text-xs transition-all"
                                 >
                                     🗑 Cancelar
@@ -270,6 +282,7 @@ export default function HoldPage() {
                                 <button
                                     onClick={() => handleRetake(order.id)}
                                     disabled={retaking === order.id}
+                                    aria-label={`Retomar cuenta de ${order.client?.name}`}
                                     className="flex-[2] bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-extrabold py-2 rounded-xl text-sm transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
                                 >
                                     {retaking === order.id ? 'Cargando...' : '💳 Retomar y Cobrar'}

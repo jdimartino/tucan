@@ -1,16 +1,32 @@
 // src/components/admin/SessionPanel.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../context/AuthContext'
 import { useSession } from '../../context/SessionContext'
 
-export default function SessionPanel() {
+export default function SessionPanel({ onSessionOpen }) {
     const { user } = useAuth()
     const { session, setSession } = useSession()
     const [rate, setRate] = useState('')
     const [opening, setOpening] = useState(false)
     const [error, setError] = useState('')
+    const [bcvRate, setBcvRate] = useState(null)
+    const [bcvDate, setBcvDate] = useState(null)
+    const [bcvLoading, setBcvLoading] = useState(true)
+
+    useEffect(() => {
+        fetch('https://ve.dolarapi.com/v1/dolares/oficial')
+            .then(r => r.json())
+            .then(data => {
+                if (data?.promedio) {
+                    setBcvRate(data.promedio)
+                    setBcvDate(data.modificado ? new Date(data.modificado) : null)
+                }
+            })
+            .catch(() => {})
+            .finally(() => setBcvLoading(false))
+    }, [])
 
     const handleOpen = async (e) => {
         e.preventDefault()
@@ -27,6 +43,7 @@ export default function SessionPanel() {
                 totalSales: 0,
             })
             setSession({ id: ref.id, exchangeRateBs: rateVal, status: 'open' })
+            onSessionOpen?.()
         } catch (err) {
             setError('Error abriendo caja. Intenta de nuevo.')
             console.error(err)
@@ -66,6 +83,29 @@ export default function SessionPanel() {
                 <form onSubmit={handleOpen} className="space-y-4">
                     <div>
                         <label className="label-xs">Tasa BCV del día (Bs / $1)</label>
+                        {bcvLoading ? (
+                            <p className="text-slate-500 text-xs mb-2">Consultando tasa BCV...</p>
+                        ) : bcvRate ? (
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                                    BCV: Bs {bcvRate.toFixed(2)} / $1
+                                </span>
+                                {bcvDate && (
+                                    <span className="text-[10px] text-slate-500">
+                                        {bcvDate.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </span>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setRate(bcvRate.toFixed(2))}
+                                    className="text-[10px] font-bold text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+                                >
+                                    Usar esta
+                                </button>
+                            </div>
+                        ) : (
+                            <p className="text-slate-500 text-xs mb-2">No se pudo obtener la tasa BCV</p>
+                        )}
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
                             <input

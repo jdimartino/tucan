@@ -79,7 +79,7 @@ export default function AdminPage() {
             <main className="flex-1 p-4 overflow-auto">
                 {activeTab === 'products' && <ProductList />}
                 {activeTab === 'users' && <UserList />}
-                {activeTab === 'caja' && <SessionPanel />}
+                {activeTab === 'caja' && <SessionPanel onSessionOpen={() => setActiveTab('products')} />}
                 {activeTab === 'report' && <ReportPage onBack={() => setActiveTab('caja')} />}
             </main>
         </div>

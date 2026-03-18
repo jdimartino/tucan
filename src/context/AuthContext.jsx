@@ -17,7 +17,8 @@ export function AuthProvider({ children }) {
                 // Obtener rol desde Firestore
                 const snap = await getDoc(doc(db, 'users', firebaseUser.uid))
                 setUser(firebaseUser)
-                setRole(snap.exists() ? snap.data().role : null)
+                const rawRole = snap.exists() ? snap.data().role : null
+                setRole(rawRole === 'admin' || rawRole === 'cashier' ? rawRole : null)
             } else {
                 setUser(null)
                 setRole(null)

@@ -1,16 +1,17 @@
 // src/pages/TicketPage.jsx
-import { useState } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useCart } from '../context/CartContext'
 import { useSession } from '../context/SessionContext'
 import { useAuth } from '../context/AuthContext'
 import { useNav } from '../context/NavigationContext'
-import { saveOrder } from '../services/orderService'
-import { formatUSD, formatBS, toCents, fromCents, calcChange } from '../utils/money'
+import { saveOrder, nextInvoiceNumber } from '../services/orderService'
+import { formatUSD, toCents, fromCents, calcChange } from '../utils/money'
+import { useToast } from '../components/Toast'
 
 const METHODS = [
     { id: 'usd_cash', label: 'Efectivo USD', icon: '💵' },
     { id: 'bs_cash', label: 'Efectivo BS', icon: '💴' },
-    { id: 'transfer', label: 'Transferencia', icon: '📲' },
+    { id: 'pago_movil', label: 'Pago Móvil', icon: '📲' },
     { id: 'mixed', label: 'Mixto', icon: '🔀' },
 ]
 
@@ -18,57 +19,62 @@ export default function TicketPage() {
     const { items, totalCents, dispatch } = useCart()
     const { session } = useSession()
     const { user } = useAuth()
-    const { setScreen, setOrderId } = useNav()
+    const { setScreen, setOrderId, setLastOrderData } = useNav()
+    const toast = useToast()
     const rate = session?.exchangeRateBs || 1
 
     const [method, setMethod] = useState('usd_cash')
     const [paid, setPaid] = useState('')
     const [paidBS, setPaidBS] = useState('')
     const [saving, setSaving] = useState(false)
+    const [invoiceNum, setInvoiceNum] = useState(null)
 
-    const totalUSD = fromCents(totalCents)
-    const totalBS = (totalUSD * rate).toFixed(2)
+    useEffect(() => {
+        nextInvoiceNumber().then(setInvoiceNum).catch(() => {})
+    }, [])
+
+    const totalUSD = useMemo(() => fromCents(totalCents), [totalCents])
+    const totalBS = useMemo(() => (totalUSD * rate).toFixed(2), [totalUSD, rate])
 
     // Calcular vuelto según método
-    const getChange = () => {
+    const change = useMemo(() => {
         if (method === 'usd_cash') {
             const paidCents = toCents(parseFloat(paid) || 0)
-            const change = calcChange(paidCents, totalCents)
-            return change > 0 ? { label: 'Vuelto USD', value: formatUSD(change) } : null
+            const ch = calcChange(paidCents, totalCents)
+            return ch > 0 ? { label: 'Vuelto USD', value: formatUSD(ch) } : null
         }
         if (method === 'bs_cash') {
             const paidBsCents = toCents(parseFloat(paidBS) || 0)
             const totalBsCents = toCents(parseFloat(totalBS))
-            const change = calcChange(paidBsCents, totalBsCents)
-            return change > 0 ? { label: 'Vuelto BS', value: `Bs ${fromCents(change).toFixed(2)}` } : null
+            const ch = calcChange(paidBsCents, totalBsCents)
+            return ch > 0 ? { label: 'Vuelto BS', value: `Bs ${fromCents(ch).toFixed(2)}` } : null
         }
         return null
-    }
+    }, [method, paid, paidBS, totalCents, totalBS])
 
-    const canPay = () => {
-        if (!session?.id) return false  // sin sesión activa NO se puede cobrar
+    const canPay = useCallback(() => {
+        if (!session?.id) return false
         if (method === 'usd_cash') return parseFloat(paid) >= totalUSD
         if (method === 'bs_cash') return parseFloat(paidBS) >= parseFloat(totalBS)
-        if (method === 'transfer') return true
+        if (method === 'pago_movil') return true
         if (method === 'mixed') return (parseFloat(paid) || 0) + (parseFloat(paidBS) || 0) > 0
         return false
-    }
+    }, [session?.id, method, paid, paidBS, totalUSD, totalBS])
 
     const handlePay = async () => {
         if (!canPay()) return
         if (!session?.id) {
-            alert('No hay caja abierta. Pide al administrador que abra la caja del día.')
+            toast.error('No hay caja abierta. Pide al administrador que abra la caja del día.')
             return
         }
         setSaving(true)
         try {
-            const change = getChange()
             const payment = {
                 method,
                 totalCents,
                 ...(method === 'usd_cash' && { paidUSD: parseFloat(paid), changeUSD: parseFloat(paid) - totalUSD }),
                 ...(method === 'bs_cash' && { paidBS: parseFloat(paidBS), changeBS: parseFloat(paidBS) - parseFloat(totalBS) }),
-                ...(method === 'transfer' && { reference: 'transfer' }),
+                ...(method === 'pago_movil' && { reference: 'pago_movil' }),
                 ...(method === 'mixed' && { paidUSD: parseFloat(paid) || 0, paidBS: parseFloat(paidBS) || 0 }),
             }
             const orderId = await saveOrder({
@@ -77,21 +83,26 @@ export default function TicketPage() {
                 exchangeRateBs: rate,
                 items,
                 payment,
+                invoiceNumber: invoiceNum,
             })
             setOrderId(orderId)
+            setLastOrderData({
+                items: [...items],
+                totalCents,
+                payment: { ...payment },
+                exchangeRateBs: rate
+            })
             dispatch({ type: 'CLEAR_CART' })
             setScreen('success')
         } catch (err) {
             console.error(err)
-            alert('Error al procesar el pago. Intenta de nuevo.')
+            toast.error('Error al procesar el pago. Intenta de nuevo.')
         } finally {
             setSaving(false)
         }
     }
 
-    const change = getChange()
-
-    // Banner de sesión no activa para el móvil
+    // Banner de sesión no activa
     const noSession = !session?.id
 
     return (
@@ -101,17 +112,28 @@ export default function TicketPage() {
             <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
                 <button
                     onClick={() => setScreen('pos')}
+                    aria-label="Volver al POS"
                     className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
                 >
                     ←
                 </button>
                 <div>
-                    <p className="text-white font-bold text-sm leading-none">Ticket de Cobro</p>
-                    <p className="text-slate-500 text-[10px]">{items.length} producto{items.length !== 1 ? 's' : ''}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-white font-bold text-sm leading-none">Ticket de Cobro</p>
+                        {invoiceNum != null
+                            ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                                #{String(invoiceNum).padStart(4, '0')}
+                              </span>
+                            : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-500 border border-white/10 animate-pulse">
+                                #----
+                              </span>
+                        }
+                    </div>
+                    <p className="text-slate-500 text-[10px] mt-0.5">{items.length} producto{items.length !== 1 ? 's' : ''}</p>
                 </div>
                 <div className="ml-auto text-right">
                     <p className="text-blue-400 font-extrabold text-lg leading-none">{formatUSD(totalCents)}</p>
-                    <p className="text-slate-500 text-[10px]">Bs {totalBS}</p>
+                    <p className="text-amber-400 font-bold text-[10px]">Bs {totalBS}</p>
                 </div>
             </header>
 
@@ -119,7 +141,7 @@ export default function TicketPage() {
 
                 {/* Alerta: sin sesión activa */}
                 {noSession && (
-                    <div className="bg-orange-500/15 border border-orange-500/30 rounded-2xl px-4 py-3 flex items-start gap-3">
+                    <div role="alert" className="bg-orange-500/15 border border-orange-500/30 rounded-2xl px-4 py-3 flex items-start gap-3">
                         <span className="text-2xl">⚠️</span>
                         <div>
                             <p className="text-orange-400 font-bold text-sm">Sin sesión de caja</p>
@@ -139,7 +161,7 @@ export default function TicketPage() {
                             </div>
                             <div className="text-right">
                                 <p className="text-blue-400 font-bold text-sm">{formatUSD(item.subtotalCents)}</p>
-                                <p className="text-slate-500 text-[10px]">Bs {(fromCents(item.subtotalCents) * rate).toFixed(2)}</p>
+                                <p className="text-amber-400 font-bold text-[10px]">Bs {(fromCents(item.subtotalCents) * rate).toFixed(2)}</p>
                             </div>
                         </div>
                     ))}
@@ -148,19 +170,20 @@ export default function TicketPage() {
                         <p className="text-white font-bold">Total</p>
                         <div className="text-right">
                             <p className="text-blue-400 font-extrabold">{formatUSD(totalCents)}</p>
-                            <p className="text-slate-400 text-xs">Bs {totalBS}</p>
+                            <p className="text-amber-400 font-bold text-xs">Bs {totalBS}</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Métodos de pago */}
-                <div>
-                    <label className="label-xs mb-2">Método de Pago</label>
+                <fieldset>
+                    <legend className="label-xs mb-2">Método de Pago</legend>
                     <div className="grid grid-cols-2 gap-2">
                         {METHODS.map(m => (
                             <button
                                 key={m.id}
                                 onClick={() => setMethod(m.id)}
+                                aria-pressed={method === m.id}
                                 className={`flex items-center gap-2 p-3 rounded-xl border font-semibold text-sm transition-all ${method === m.id
                                     ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/30'
                                     : 'bg-[#1E293B] border-white/5 text-slate-300 hover:border-blue-500/30'
@@ -170,15 +193,16 @@ export default function TicketPage() {
                             </button>
                         ))}
                     </div>
-                </div>
+                </fieldset>
 
                 {/* Input monto recibido */}
                 {(method === 'usd_cash' || method === 'mixed') && (
                     <div>
-                        <label className="label-xs">Monto recibido (USD)</label>
+                        <label htmlFor="paid-usd" className="label-xs">Monto recibido (USD)</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                             <input
+                                id="paid-usd"
                                 type="number" step="0.01" min={totalUSD}
                                 value={paid}
                                 onChange={e => setPaid(e.target.value)}
@@ -190,10 +214,11 @@ export default function TicketPage() {
                 )}
                 {(method === 'bs_cash' || method === 'mixed') && (
                     <div>
-                        <label className="label-xs">Monto recibido (BS)</label>
+                        <label htmlFor="paid-bs" className="label-xs">Monto recibido (BS)</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
                             <input
+                                id="paid-bs"
                                 type="number" step="0.01" min={method === 'bs_cash' ? parseFloat(totalBS) : 0}
                                 value={paidBS}
                                 onChange={e => setPaidBS(e.target.value)}
@@ -211,9 +236,9 @@ export default function TicketPage() {
                         <p className="text-green-400 font-extrabold text-lg">{change.value}</p>
                     </div>
                 )}
-                {method === 'transfer' && (
+                {method === 'pago_movil' && (
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl px-4 py-3">
-                        <p className="text-blue-400 font-semibold text-sm text-center">📲 Confirma la transferencia antes de cobrar</p>
+                        <p className="text-blue-400 font-semibold text-sm text-center">📲 Confirma la transacción antes de cobrar</p>
                     </div>
                 )}
             </div>

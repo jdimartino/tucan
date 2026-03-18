@@ -8,9 +8,10 @@ const NavContext = createContext(null)
 export function NavigationProvider({ children }) {
     const [screen, setScreen] = useState('pos')
     const [lastOrderId, setOrderId] = useState(null)
+    const [lastOrderData, setLastOrderData] = useState(null)
 
     return (
-        <NavContext.Provider value={{ screen, setScreen, lastOrderId, setOrderId }}>
+        <NavContext.Provider value={{ screen, setScreen, lastOrderId, setOrderId, lastOrderData, setLastOrderData }}>
             {children}
         </NavContext.Provider>
     )

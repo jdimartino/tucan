@@ -8,7 +8,8 @@ import { useCart } from '../context/CartContext'
 import { useNav } from '../context/NavigationContext'
 import { useProducts } from '../hooks/useProducts'
 import { useOpenOrders } from '../hooks/useOpenOrders'
-import { formatUSD, formatBS } from '../utils/money'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { formatUSD } from '../utils/money'
 
 const ALL = 'Todos'
 
@@ -19,6 +20,7 @@ export default function POSPage() {
     const { setScreen } = useNav()
     const { products, loading } = useProducts()
     const { orders: holdOrders } = useOpenOrders(session?.id)
+    const isOnline = useOnlineStatus()
     const holdCount = holdOrders?.length || 0
     const [activeCategory, setActiveCategory] = useState(ALL)
 
@@ -28,19 +30,28 @@ export default function POSPage() {
         return [ALL, ...cats]
     }, [products])
 
-    const filtered = products.filter(p =>
+    const filtered = useMemo(() => products.filter(p =>
         p.active &&
         (activeCategory === ALL || p.category === activeCategory)
-    )
+    ), [products, activeCategory])
 
     // Guardia: si no hay sesión activa, pedir abrir caja
-    if (!session?.status === 'open' && !loading) {
+    if (session?.status !== 'open' && !loading) {
         return (
             <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-center">
                 <div className="text-5xl mb-4">🏪</div>
                 <h2 className="text-white text-xl font-bold mb-2">Caja cerrada</h2>
                 <p className="text-slate-400 text-sm mb-6">Pide al Admin que abra la caja del día antes de facturar.</p>
-                <button onClick={() => signOut(auth)} className="btn-secondary text-sm">← Cerrar Sesión</button>
+                <div className="flex flex-col gap-2 w-full max-w-xs">
+                    {role === 'admin' && (
+                        <button onClick={() => setScreen('admin')} className="btn-primary text-sm">
+                            ⚙️ Ir al Panel Admin
+                        </button>
+                    )}
+                    <button onClick={() => signOut(auth)} className="btn-secondary text-sm">
+                        ← Cerrar Sesión
+                    </button>
+                </div>
             </div>
         )
     }
@@ -51,13 +62,21 @@ export default function POSPage() {
             {/* ── Header ── */}
             <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div>
-                    <p className="text-white font-bold text-sm leading-none">🦜 TucanApp POS</p>
+                    <p className="text-white font-bold text-sm leading-none">
+                        🦜 TucanApp POS
+                        {!isOnline && (
+                            <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/20">
+                                Offline
+                            </span>
+                        )}
+                    </p>
                     <p className="text-slate-500 text-[10px] leading-none mt-0.5">{user?.email}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {holdCount > 0 && (
                         <button
                             onClick={() => setScreen('hold')}
+                            aria-label={`${holdCount} facturas en espera`}
                             className="bg-amber-500/20 text-amber-400 text-[10px] sm:text-xs font-extrabold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full flex items-center gap-1 hover:bg-amber-500/30 transition-colors"
                         >
                             ⏳ <span className="hidden sm:inline">En espera:</span> {holdCount}
@@ -71,6 +90,7 @@ export default function POSPage() {
                     {role === 'admin' && (
                         <button
                             onClick={() => setScreen?.('admin')}
+                            aria-label="Panel de administración"
                             className="text-xs text-slate-400 hover:text-blue-400 transition-colors font-semibold px-2 py-1 rounded-lg hover:bg-blue-500/10"
                         >
                             ⚙️
@@ -78,6 +98,7 @@ export default function POSPage() {
                     )}
                     <button
                         onClick={() => signOut(auth)}
+                        aria-label="Cerrar sesión"
                         className="text-xs text-slate-400 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 font-semibold"
                     >
                         Salir
@@ -86,12 +107,13 @@ export default function POSPage() {
             </header>
 
             {/* ── Filtros de categoría ── */}
-            <div className="px-4 pt-4 pb-2">
+            <nav className="px-4 pt-4 pb-2" aria-label="Filtros de categoría">
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                     {categories.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
+                            aria-pressed={activeCategory === cat}
                             className={`whitespace-nowrap text-xs font-bold px-4 py-2 rounded-full transition-all flex-shrink-0 ${activeCategory === cat
                                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                                 : 'bg-[#1E293B] text-slate-400 hover:text-white border border-white/5'
@@ -101,7 +123,7 @@ export default function POSPage() {
                         </button>
                     ))}
                 </div>
-            </div>
+            </nav>
 
             {/* ── Grilla de Productos ── */}
             <main className="flex-1 px-4">
@@ -180,6 +202,7 @@ export default function POSPage() {
                     <div className="flex justify-end">
                         <button
                             onClick={() => setScreen('hold')}
+                            aria-label={`Ver ${holdCount} facturas en espera`}
                             className="pointer-events-auto bg-amber-500 hover:bg-amber-400 text-[#0F172A] font-bold py-1.5 px-4 rounded-full shadow-lg transition-all flex items-center gap-1.5 active:scale-95 text-xs"
                         >
                             <span>⏳</span>
@@ -208,23 +231,26 @@ function ProductCard({ product, qty, rate, onAdd, onRemove }) {
             <div className="text-3xl text-center mt-1 mb-2">{product.emoji}</div>
             <p className="text-white text-xs font-semibold text-center leading-tight mb-0.5 line-clamp-2">{product.name}</p>
             <p className="text-blue-400 text-sm font-extrabold text-center">${product.priceUSD.toFixed(2)}</p>
-            {bsPrice && <p className="text-slate-500 text-[10px] text-center mb-2">{bsPrice}</p>}
+            {bsPrice && <p className="text-amber-400 font-bold text-[10px] text-center mb-2">{bsPrice}</p>}
 
             <div className="mt-auto pt-2 flex gap-1">
                 {qty > 0 ? (
                     <>
                         <button
                             onClick={onRemove}
+                            aria-label={`Quitar ${product.name}`}
                             className="flex-1 bg-white/5 hover:bg-white/10 text-white font-bold py-2 rounded-xl text-sm transition-colors active:scale-95"
                         >−</button>
                         <button
                             onClick={onAdd}
+                            aria-label={`Agregar más ${product.name}`}
                             className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-sm transition-colors active:scale-95"
                         >+</button>
                     </>
                 ) : (
                     <button
                         onClick={onAdd}
+                        aria-label={`Agregar ${product.name}`}
                         className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-sm transition-colors active:scale-95"
                     >Agregar</button>
                 )}

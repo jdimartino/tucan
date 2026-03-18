@@ -3,9 +3,11 @@ import { useState } from 'react'
 import { useProducts } from '../../hooks/useProducts'
 import { deleteProduct, toggleProduct } from '../../services/productService'
 import ProductForm from './ProductForm'
+import { useToast } from '../Toast'
 
 export default function ProductList() {
     const { products, loading } = useProducts()
+    const toast = useToast()
     const [showForm, setShowForm] = useState(false)
     const [editing, setEditing] = useState(null)
     const [search, setSearch] = useState('')
@@ -23,6 +25,17 @@ export default function ProductList() {
         return acc
     }, {})
 
+    const handleDelete = async (id) => {
+        try {
+            await deleteProduct(id)
+            setConfirm(null)
+            toast.success('Producto eliminado')
+        } catch (err) {
+            console.error(err)
+            toast.error('Error al eliminar el producto.')
+        }
+    }
+
     if (loading) return (
         <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -38,6 +51,7 @@ export default function ProductList() {
                     onChange={e => setSearch(e.target.value)}
                     placeholder="🔍 Buscar producto..."
                     className="input-field flex-1"
+                    aria-label="Buscar producto"
                 />
                 <button
                     onClick={() => { setEditing(null); setShowForm(true) }}
@@ -75,13 +89,15 @@ export default function ProductList() {
                                         {/* Toggle activo */}
                                         <button
                                             onClick={() => toggleProduct(p.id, !p.active)}
+                                            aria-label={p.active ? `Desactivar ${p.name}` : `Activar ${p.name}`}
                                             className={`text-xs px-2 py-1 rounded-lg font-bold transition-colors ${p.active ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                                         >
-                                            {p.active ? '✓' : '○'}
+                                            {p.active ? '✓ Activo' : '○ Inactivo'}
                                         </button>
                                         {/* Editar */}
                                         <button
                                             onClick={() => { setEditing(p); setShowForm(true) }}
+                                            aria-label={`Editar ${p.name}`}
                                             className="text-xs px-2 py-1 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 font-bold transition-colors"
                                         >
                                             ✏️
@@ -89,6 +105,7 @@ export default function ProductList() {
                                         {/* Eliminar */}
                                         <button
                                             onClick={() => setConfirm(p.id)}
+                                            aria-label={`Eliminar ${p.name}`}
                                             className="text-xs px-2 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-colors"
                                         >
                                             🗑️
@@ -111,7 +128,7 @@ export default function ProductList() {
 
             {/* Modal confirmar eliminación */}
             {confirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-label="Confirmar eliminación">
                     <div className="bg-[#1E293B] rounded-[24px] p-6 w-full max-w-sm text-center shadow-2xl">
                         <div className="text-4xl mb-3">🗑️</div>
                         <h3 className="text-white font-bold text-lg mb-1">¿Eliminar producto?</h3>
@@ -119,7 +136,7 @@ export default function ProductList() {
                         <div className="flex gap-3">
                             <button onClick={() => setConfirm(null)} className="btn-secondary flex-1">Cancelar</button>
                             <button
-                                onClick={async () => { await deleteProduct(confirm); setConfirm(null) }}
+                                onClick={() => handleDelete(confirm)}
                                 className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 px-4 rounded-xl transition-colors"
                             >
                                 Eliminar
