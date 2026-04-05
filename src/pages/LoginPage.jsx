@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '../firebase'
+import TucanIcon from '../components/TucanIcon'
 
 export default function LoginPage() {
     const [email, setEmail] = useState('')
@@ -25,7 +26,7 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-[#0F172A]">
             <div className="bg-[#1E293B] rounded-[24px] p-8 w-full max-w-md shadow-2xl border border-white/5">
-                <div className="text-5xl text-center mb-4">🦜</div>
+                <div className="flex justify-center mb-4"><TucanIcon className="w-16 h-16" /></div>
                 <h1 className="text-2xl font-extrabold text-center mb-1 text-white">TucanApp</h1>
                 <p className="text-slate-400 text-center text-sm mb-8">
                     Sistema POS · Ingresa tu cuenta

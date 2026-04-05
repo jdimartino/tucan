@@ -4,12 +4,12 @@ import { useCart } from '../context/CartContext'
 import { useSession } from '../context/SessionContext'
 import { useAuth } from '../context/AuthContext'
 import { useNav } from '../context/NavigationContext'
-import { saveOrder, nextInvoiceNumber } from '../services/orderService'
-import { formatUSD, toCents, fromCents, calcChange } from '../utils/money'
+import { saveOrder, nextInvoiceNumber, completeHoldOrder } from '../services/orderService'
+import { formatUSD, formatBsNum, toCents, fromCents, calcChange } from '../utils/money'
 import { useToast } from '../components/Toast'
 
 const METHODS = [
-    { id: 'usd_cash', label: 'Efectivo USD', icon: '💵' },
+    { id: 'usd_cash', label: 'Cash USD', icon: '💵' },
     { id: 'bs_cash', label: 'Efectivo BS', icon: '💴' },
     { id: 'pago_movil', label: 'Pago Móvil', icon: '📲' },
     { id: 'mixed', label: 'Mixto', icon: '🔀' },
@@ -19,7 +19,7 @@ export default function TicketPage() {
     const { items, totalCents, dispatch } = useCart()
     const { session } = useSession()
     const { user } = useAuth()
-    const { setScreen, setOrderId, setLastOrderData } = useNav()
+    const { setScreen, setOrderId, setLastOrderData, holdOrderId, setHoldOrderId } = useNav()
     const toast = useToast()
     const rate = session?.exchangeRateBs || 1
 
@@ -28,6 +28,7 @@ export default function TicketPage() {
     const [paidBS, setPaidBS] = useState('')
     const [saving, setSaving] = useState(false)
     const [invoiceNum, setInvoiceNum] = useState(null)
+    const [reference, setReference] = useState('')
 
     useEffect(() => {
         nextInvoiceNumber().then(setInvoiceNum).catch(() => {})
@@ -35,6 +36,17 @@ export default function TicketPage() {
 
     const totalUSD = useMemo(() => fromCents(totalCents), [totalCents])
     const totalBS = useMemo(() => (totalUSD * rate).toFixed(2), [totalUSD, rate])
+
+    const mixedRemaining = useMemo(() => {
+        if (method !== 'mixed') return null
+        const paidUSDVal = parseFloat(paid) || 0
+        const paidBSVal = parseFloat(paidBS) || 0
+        const totalPaidUSD = paidUSDVal + (paidBSVal / rate)
+        const remainingUSD = Math.max(0, totalUSD - totalPaidUSD)
+        const remainingBS = remainingUSD * rate
+        const covered = remainingUSD < 0.005
+        return { remainingUSD, remainingBS, covered }
+    }, [method, paid, paidBS, totalUSD, rate])
 
     // Calcular vuelto según método
     const change = useMemo(() => {
@@ -57,7 +69,7 @@ export default function TicketPage() {
         if (method === 'usd_cash') return parseFloat(paid) >= totalUSD
         if (method === 'bs_cash') return parseFloat(paidBS) >= parseFloat(totalBS)
         if (method === 'pago_movil') return true
-        if (method === 'mixed') return (parseFloat(paid) || 0) + (parseFloat(paidBS) || 0) > 0
+        if (method === 'mixed') return !!mixedRemaining?.covered
         return false
     }, [session?.id, method, paid, paidBS, totalUSD, totalBS])
 
@@ -74,7 +86,7 @@ export default function TicketPage() {
                 totalCents,
                 ...(method === 'usd_cash' && { paidUSD: parseFloat(paid), changeUSD: parseFloat(paid) - totalUSD }),
                 ...(method === 'bs_cash' && { paidBS: parseFloat(paidBS), changeBS: parseFloat(paidBS) - parseFloat(totalBS) }),
-                ...(method === 'pago_movil' && { reference: 'pago_movil' }),
+                ...(method === 'pago_movil' && { reference }),
                 ...(method === 'mixed' && { paidUSD: parseFloat(paid) || 0, paidBS: parseFloat(paidBS) || 0 }),
             }
             const orderId = await saveOrder({
@@ -93,6 +105,10 @@ export default function TicketPage() {
                 exchangeRateBs: rate
             })
             dispatch({ type: 'CLEAR_CART' })
+            if (holdOrderId) {
+                await completeHoldOrder(holdOrderId)
+                setHoldOrderId(null)
+            }
             setScreen('success')
         } catch (err) {
             console.error(err)
@@ -111,11 +127,11 @@ export default function TicketPage() {
             {/* Header */}
             <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
                 <button
-                    onClick={() => setScreen('pos')}
+                    onClick={() => { setHoldOrderId(null); setScreen('pos') }}
                     aria-label="Volver al POS"
-                    className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
+                    className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-sm px-3 py-2 rounded-xl transition-all"
                 >
-                    ←
+                    ← Atrás
                 </button>
                 <div>
                     <div className="flex items-center gap-2">
@@ -133,7 +149,7 @@ export default function TicketPage() {
                 </div>
                 <div className="ml-auto text-right">
                     <p className="text-blue-400 font-extrabold text-lg leading-none">{formatUSD(totalCents)}</p>
-                    <p className="text-amber-400 font-bold text-[10px]">Bs {totalBS}</p>
+                    <p className="text-amber-400 font-bold text-sm">Bs {formatBsNum(parseFloat(totalBS))}</p>
                 </div>
             </header>
 
@@ -153,15 +169,15 @@ export default function TicketPage() {
                 {/* Lista de ítems */}
                 <div className="bg-[#1E293B] rounded-2xl overflow-hidden">
                     {items.map((item, i) => (
-                        <div key={item.productId} className={`flex items-center gap-3 px-4 py-3 ${i < items.length - 1 ? 'border-b border-white/5' : ''}`}>
-                            <span className="text-xl">{item.emoji}</span>
+                        <div key={item.productId} className={`flex items-center gap-3 px-4 py-2 ${i < items.length - 1 ? 'border-b border-white/5' : ''}`}>
+                            <span className="text-base">{item.emoji}</span>
                             <div className="flex-1">
-                                <p className="text-white text-sm font-semibold">{item.name}</p>
-                                <p className="text-slate-500 text-xs">{item.qty} × {formatUSD(item.unitPriceCents)}</p>
+                                <p className="text-white text-xs font-semibold">{item.name}</p>
+                                <p className="text-slate-500 text-[10px]">{item.qty} × {formatUSD(item.unitPriceCents)}</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-blue-400 font-bold text-sm">{formatUSD(item.subtotalCents)}</p>
-                                <p className="text-amber-400 font-bold text-[10px]">Bs {(fromCents(item.subtotalCents) * rate).toFixed(2)}</p>
+                                <p className="text-blue-400 font-bold text-xs">{formatUSD(item.subtotalCents)}</p>
+                                <p className="text-amber-400 font-bold text-[10px]">Bs {formatBsNum(fromCents(item.subtotalCents) * rate)}</p>
                             </div>
                         </div>
                     ))}
@@ -170,7 +186,7 @@ export default function TicketPage() {
                         <p className="text-white font-bold">Total</p>
                         <div className="text-right">
                             <p className="text-blue-400 font-extrabold">{formatUSD(totalCents)}</p>
-                            <p className="text-amber-400 font-bold text-xs">Bs {totalBS}</p>
+                            <p className="text-amber-400 font-bold text-sm">Bs {formatBsNum(parseFloat(totalBS))}</p>
                         </div>
                     </div>
                 </div>
@@ -196,7 +212,7 @@ export default function TicketPage() {
                 </fieldset>
 
                 {/* Input monto recibido */}
-                {(method === 'usd_cash' || method === 'mixed') && (
+                {method === 'usd_cash' && (
                     <div>
                         <label htmlFor="paid-usd" className="label-xs">Monto recibido (USD)</label>
                         <div className="relative">
@@ -212,20 +228,71 @@ export default function TicketPage() {
                         </div>
                     </div>
                 )}
-                {(method === 'bs_cash' || method === 'mixed') && (
+                {method === 'bs_cash' && (
                     <div>
                         <label htmlFor="paid-bs" className="label-xs">Monto recibido (BS)</label>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
                             <input
                                 id="paid-bs"
-                                type="number" step="0.01" min={method === 'bs_cash' ? parseFloat(totalBS) : 0}
+                                type="number" step="0.01" min={parseFloat(totalBS)}
                                 value={paidBS}
                                 onChange={e => setPaidBS(e.target.value)}
                                 className="input-field pl-10"
                                 placeholder={totalBS}
                             />
                         </div>
+                    </div>
+                )}
+
+                {/* Pago Mixto */}
+                {method === 'mixed' && (
+                    <div className="bg-[#1E293B] rounded-2xl p-4 space-y-3 border border-white/5">
+                        <div>
+                            <label htmlFor="paid-usd-mixed" className="label-xs">Recibido en USD</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <input
+                                    id="paid-usd-mixed"
+                                    type="number" step="0.01" min="0"
+                                    value={paid}
+                                    onChange={e => setPaid(e.target.value)}
+                                    className="input-field pl-8"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor="paid-bs-mixed" className="label-xs">Recibido en BS</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
+                                <input
+                                    id="paid-bs-mixed"
+                                    type="number" step="0.01" min="0"
+                                    value={paidBS}
+                                    onChange={e => setPaidBS(e.target.value)}
+                                    className="input-field pl-10"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                        {(paid || paidBS) && mixedRemaining && (
+                            <div className={`rounded-xl px-4 py-3 flex justify-between items-center border ${
+                                mixedRemaining.covered
+                                    ? 'bg-green-500/10 border-green-500/20'
+                                    : 'bg-amber-500/10 border-amber-500/20'
+                            }`}>
+                                <p className={`font-bold text-sm ${mixedRemaining.covered ? 'text-green-400' : 'text-amber-400'}`}>
+                                    {mixedRemaining.covered ? '✅ Total cubierto' : 'Restante'}
+                                </p>
+                                {!mixedRemaining.covered && (
+                                    <div className="text-right">
+                                        <p className="text-amber-400 font-extrabold">${mixedRemaining.remainingUSD.toFixed(2)}</p>
+                                        <p className="text-amber-400/70 text-xs font-bold">Bs {formatBsNum(mixedRemaining.remainingBS)}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -237,8 +304,18 @@ export default function TicketPage() {
                     </div>
                 )}
                 {method === 'pago_movil' && (
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl px-4 py-3">
-                        <p className="text-blue-400 font-semibold text-sm text-center">📲 Confirma la transacción antes de cobrar</p>
+                    <div>
+                        <label htmlFor="pm-ref" className="label-xs">Número de operación</label>
+                        <input
+                            id="pm-ref"
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={8}
+                            value={reference}
+                            onChange={e => setReference(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                            className="input-field"
+                            placeholder="12345678"
+                        />
                     </div>
                 )}
             </div>

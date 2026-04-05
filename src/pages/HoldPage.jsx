@@ -5,15 +5,15 @@ import { useSession } from '../context/SessionContext'
 import { useAuth } from '../context/AuthContext'
 import { useNav } from '../context/NavigationContext'
 import { useOpenOrders } from '../hooks/useOpenOrders'
-import { saveHoldOrder, reopenOrder, cancelHoldOrder, appendHoldOrder } from '../services/orderService'
-import { formatUSD, fromCents } from '../utils/money'
+import { saveHoldOrder, reopenOrder, cancelHoldOrder, appendHoldOrder, getOrderItems } from '../services/orderService'
+import { formatUSD, formatBsNum, fromCents } from '../utils/money'
 import { useToast } from '../components/Toast'
 
 export default function HoldPage() {
     const { items, totalCents, dispatch } = useCart()
     const { session } = useSession()
     const { user } = useAuth()
-    const { setScreen } = useNav()
+    const { setScreen, setHoldOrderId } = useNav()
     const { orders, loading } = useOpenOrders(session?.id)
     const toast = useToast()
 
@@ -23,6 +23,8 @@ export default function HoldPage() {
     const [retaking, setRetaking] = useState(null)
     const [assignMode, setAssignMode] = useState('new')
     const [selectedOrderId, setSelectedOrderId] = useState('')
+    const [expandedOrderId, setExpandedOrderId] = useState(null)
+    const [orderItems, setOrderItems] = useState({})
 
     const rate = session?.exchangeRateBs || 1
     const hasItems = items.length > 0
@@ -78,6 +80,7 @@ export default function HoldPage() {
                     })
                 }
             })
+            setHoldOrderId(orderId)
             setScreen('ticket')
         } catch (err) {
             console.error(err)
@@ -95,6 +98,26 @@ export default function HoldPage() {
         } catch (err) {
             toast.error('Error al cancelar la cuenta.')
         }
+    }
+
+    const handleExpand = async (orderId) => {
+        if (expandedOrderId === orderId) { setExpandedOrderId(null); return }
+        setExpandedOrderId(orderId)
+        if (!orderItems[orderId]) {
+            const items = await getOrderItems(orderId)
+            setOrderItems(prev => ({ ...prev, [orderId]: items }))
+        }
+    }
+
+    const handleNotify = (order, items) => {
+        const phone = order.client?.phone?.replace(/^0/, '58')
+        const totalUSD = formatUSD(order.totalCents)
+        const totalBs = formatBsNum(fromCents(order.totalCents) * rate)
+        const lines = (items || [])
+            .map(i => `${i.emoji} ${i.name} x${i.qty} — $${(i.subtotalCents / 100).toFixed(2)}`)
+            .join('\n')
+        const msg = `🦜 *TucanApp* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:\n\n${lines || '(sin detalle cargado)'}\n\n💵 *Total: ${totalUSD}*\n💴 *Bs ${totalBs}*\n\nGracias por tu visita 🙏`
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
     const formatTime = (ts) => {
@@ -253,39 +276,65 @@ export default function HoldPage() {
 
                     {!loading && orders.map(order => (
                         <div key={order.id} className="bg-[#1E293B] rounded-2xl p-4 border border-white/5 mb-3">
-                            {/* Info cliente */}
-                            <div className="flex items-start justify-between mb-3">
+                            {/* Header clickeable */}
+                            <div
+                                className="flex items-start justify-between cursor-pointer select-none"
+                                onClick={() => handleExpand(order.id)}
+                            >
                                 <div>
-                                    <p className="text-white font-bold text-base leading-none">
-                                        {order.client?.name}
-                                    </p>
+                                    <p className="text-white font-bold text-base leading-none">{order.client?.name}</p>
                                     <p className="text-slate-500 text-xs mt-0.5">📱 {order.client?.phone}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-blue-400 font-extrabold">{formatUSD(order.totalCents)}</p>
-                                    <p className="text-slate-600 text-[10px]">
-                                        Bs {(fromCents(order.totalCents) * rate).toFixed(0)}
+                                    <p className="text-amber-400 text-xs font-bold">
+                                        Bs {formatBsNum(fromCents(order.totalCents) * rate)}
                                     </p>
                                     <p className="text-slate-600 text-[10px] mt-0.5">{formatTime(order.createdAt)}</p>
                                 </div>
                             </div>
 
+                            {/* Detalle expandible */}
+                            {expandedOrderId === order.id && (
+                                <div className="mt-3 border-t border-white/5 pt-3 space-y-1">
+                                    {!orderItems[order.id]
+                                        ? <p className="text-slate-500 text-xs animate-pulse">Cargando...</p>
+                                        : orderItems[order.id].map(item => (
+                                            <div key={item.productId} className="flex justify-between text-xs">
+                                                <span className="text-slate-300">
+                                                    {item.emoji} {item.name}
+                                                    <span className="text-slate-500 ml-1">x{item.qty}</span>
+                                                </span>
+                                                <span className="text-blue-400 font-bold">
+                                                    ${(item.subtotalCents / 100).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                            )}
+
                             {/* Botones */}
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 mt-3">
+                                <button
+                                    onClick={() => handleNotify(order, orderItems[order.id])}
+                                    className="flex-1 bg-green-500/15 hover:bg-green-500/25 border border-green-500/25 text-green-400 font-bold py-2.5 rounded-xl text-xs transition-all"
+                                >
+                                    📲 Notificar
+                                </button>
                                 <button
                                     onClick={() => handleCancel(order.id)}
-                                    aria-label={`Cancelar cuenta de ${order.client?.name}`}
-                                    className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-semibold py-2 rounded-xl text-xs transition-all"
+                                    aria-label="Eliminar"
+                                    className="bg-red-500/15 hover:bg-red-500/25 border border-red-500/20 text-red-400 font-bold px-3 py-2.5 rounded-xl text-sm transition-all"
                                 >
-                                    🗑 Cancelar
+                                    🗑️
                                 </button>
                                 <button
                                     onClick={() => handleRetake(order.id)}
                                     disabled={retaking === order.id}
-                                    aria-label={`Retomar cuenta de ${order.client?.name}`}
-                                    className="flex-[2] bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-extrabold py-2 rounded-xl text-sm transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
+                                    className="flex-[2] bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-extrabold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
                                 >
-                                    {retaking === order.id ? 'Cargando...' : '💳 Retomar y Cobrar'}
+                                    {retaking === order.id ? 'Cargando...' : '💳 Cobrar'}
                                 </button>
                             </div>
                         </div>

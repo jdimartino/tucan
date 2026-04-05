@@ -1,5 +1,6 @@
 // src/components/ErrorBoundary.jsx
 import { Component } from 'react'
+import TucanIcon from './TucanIcon'
 
 export default class ErrorBoundary extends Component {
     constructor(props) {
@@ -19,7 +20,7 @@ export default class ErrorBoundary extends Component {
         if (this.state.hasError) {
             return (
                 <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-center">
-                    <div className="text-5xl mb-4">🦜</div>
+                    <div className="flex justify-center mb-4"><TucanIcon className="w-16 h-16" /></div>
                     <h1 className="text-white text-xl font-bold mb-2">Algo salió mal</h1>
                     <p className="text-slate-400 text-sm mb-6 max-w-sm">
                         Ocurrió un error inesperado. Intenta recargar la página.

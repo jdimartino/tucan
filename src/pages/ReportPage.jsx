@@ -3,9 +3,10 @@
 import { useSession } from '../context/SessionContext'
 import { useSalesReport } from '../hooks/useSalesReport'
 import { closeSession } from '../services/sessionService'
-import { formatUSD, fromCents } from '../utils/money'
+import { formatUSD, formatBsNum, fromCents } from '../utils/money'
 import { useState } from 'react'
 import { useToast } from '../components/Toast'
+import { getOrderItems } from '../services/orderService'
 
 export default function ReportPage({ onBack }) {
     const { session, setSession } = useSession()
@@ -14,15 +15,37 @@ export default function ReportPage({ onBack }) {
     const [closing, setClosing] = useState(false)
     const [confirm, setConfirm] = useState(false)
     const [closed, setClosed] = useState(false)
+    const [expandedOrderId, setExpandedOrderId] = useState(null)
+    const [orderItems, setOrderItems] = useState({})
+    const [expandedMethod, setExpandedMethod] = useState(null)
 
     const rate = session?.exchangeRateBs || 1
 
     // Desglose por método de pago
     const byMethod = orders.reduce((acc, o) => {
-        const m = o?.payment?.method || 'unknown'
+        const m = o.paymentMethod || 'unknown'
         acc[m] = (acc[m] || 0) + (o.totalCents || 0)
         return acc
     }, {})
+
+    // Sumatoria Mixto
+    const mixedOrders = orders.filter(o => o.paymentMethod === 'mixed')
+    const mixedUSD = mixedOrders.reduce((s, o) => s + (o.paymentData?.paidUSD || 0), 0)
+    const mixedBS  = mixedOrders.reduce((s, o) => s + (o.paymentData?.paidBS  || 0), 0)
+
+    // Total BS Pago Móvil
+    const pagoMovilBS = orders
+        .filter(o => o.paymentMethod === 'pago_movil')
+        .reduce((s, o) => s + fromCents(o.totalCents) * (o.rateAtTime || rate), 0)
+
+    const handleExpandOrder = async (orderId) => {
+        if (expandedOrderId === orderId) { setExpandedOrderId(null); return }
+        setExpandedOrderId(orderId)
+        if (!orderItems[orderId]) {
+            const items = await getOrderItems(orderId)
+            setOrderItems(prev => ({ ...prev, [orderId]: items }))
+        }
+    }
 
     const METHOD_LABELS = {
         usd_cash: '💵 Efectivo USD',
@@ -46,6 +69,39 @@ export default function ReportPage({ onBack }) {
             setClosing(false)
             setConfirm(false)
         }
+    }
+
+    const handleShareWhatsApp = () => {
+        const date = new Date().toLocaleDateString('es-VE', { day: 'numeric', month: 'long', year: 'numeric' })
+        const methodLines = Object.entries(byMethod)
+            .map(([m, cents]) => `  ${METHOD_LABELS[m] || m} — ${formatUSD(cents)}`)
+            .join('\n')
+        const orderLines = orders
+            .map(o => {
+                const num = o.invoiceNumber != null ? `#${String(o.invoiceNumber).padStart(4, '0')}` : `#${o.id.slice(0, 6)}`
+                const time = o.createdAt?.seconds
+                    ? new Date(o.createdAt.seconds * 1000).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })
+                    : ''
+                return `  ${num} ${time} — ${formatUSD(o.totalCents || 0)}`
+            })
+            .join('\n')
+        const msg = [
+            `🦜 *TucanApp — Reporte del Día*`,
+            `📅 ${date}`,
+            ``,
+            `💵 *Total Ventas: ${formatUSD(totalUSD * 100)}*`,
+            `💴 Bs ${(totalUSD * rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            `📊 Transacciones: ${totalTx}`,
+            ``,
+            `*Desglose por método:*`,
+            methodLines,
+            ``,
+            `*Órdenes:*`,
+            orderLines,
+            ``,
+            `Tasa del día: Bs ${rate} / $1`,
+        ].join('\n')
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
     if (closed) {
@@ -77,7 +133,7 @@ export default function ReportPage({ onBack }) {
                 <div className="bg-[#1E293B] rounded-2xl p-4 text-center border border-white/5">
                     <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Ventas</p>
                     <p className="text-blue-400 font-extrabold text-2xl">{formatUSD(totalUSD * 100)}</p>
-                    <p className="text-slate-500 text-xs mt-0.5">Bs {(totalUSD * rate).toFixed(2)}</p>
+                    <p className="text-slate-500 text-xs mt-0.5">Bs {formatBsNum(totalUSD * rate)}</p>
                 </div>
                 <div className="bg-[#1E293B] rounded-2xl p-4 text-center border border-white/5">
                     <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Transacciones</p>
@@ -97,12 +153,44 @@ export default function ReportPage({ onBack }) {
                 <div>
                     <p className="label-xs mb-2">Desglose por Método</p>
                     <div className="bg-[#1E293B] rounded-2xl overflow-hidden border border-white/5">
-                        {Object.entries(byMethod).map(([m, cents], i, arr) => (
-                            <div key={m} className={`flex justify-between items-center px-4 py-3 ${i < arr.length - 1 ? 'border-b border-white/5' : ''}`}>
-                                <p className="text-slate-300 text-sm">{METHOD_LABELS[m] || m}</p>
-                                <p className="text-blue-400 font-bold text-sm">{formatUSD(cents)}</p>
-                            </div>
-                        ))}
+                        {Object.entries(byMethod).map(([m, cents], i, arr) => {
+                            const hasDetail = m === 'mixed' || m === 'pago_movil'
+                            const isExpanded = expandedMethod === m
+                            return (
+                                <div key={m} className={i < arr.length - 1 ? 'border-b border-white/5' : ''}>
+                                    <div
+                                        className={`flex justify-between items-center px-4 py-3 ${hasDetail ? 'cursor-pointer' : ''}`}
+                                        onClick={() => hasDetail && setExpandedMethod(isExpanded ? null : m)}
+                                    >
+                                        <p className="text-slate-300 text-sm">{METHOD_LABELS[m] || m}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-blue-400 font-bold text-sm">{formatUSD(cents)}</p>
+                                            {hasDetail && <span className="text-slate-600 text-xs">{isExpanded ? '▲' : '▼'}</span>}
+                                        </div>
+                                    </div>
+                                    {isExpanded && m === 'mixed' && (
+                                        <div className="px-4 pb-3 space-y-1 border-t border-white/5 pt-2">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">💵 USD recibido</span>
+                                                <span className="text-slate-300 font-bold">${mixedUSD.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">💴 BS recibido</span>
+                                                <span className="text-amber-400 font-bold">Bs {formatBsNum(mixedBS)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isExpanded && m === 'pago_movil' && (
+                                        <div className="px-4 pb-3 border-t border-white/5 pt-2">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">💴 Total en BS</span>
+                                                <span className="text-amber-400 font-bold">Bs {formatBsNum(pagoMovilBS)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             )}
@@ -113,12 +201,54 @@ export default function ReportPage({ onBack }) {
                     <p className="label-xs mb-2">Órdenes del Día ({orders.length})</p>
                     <div className="space-y-2">
                         {orders.map((o) => (
-                            <div key={o.id} className="bg-[#1E293B] rounded-xl px-4 py-2.5 flex items-center justify-between border border-white/5">
-                                <div>
-                                    <p className="text-white text-xs font-semibold font-mono">#{o.id.slice(0, 8)}</p>
-                                    <p className="text-slate-500 text-[10px]">{METHOD_LABELS[o?.payment?.method] || 'N/A'}</p>
+                            <div key={o.id} className="bg-[#1E293B] rounded-xl border border-white/5 overflow-hidden">
+                                <div
+                                    className="px-4 py-2.5 flex items-center justify-between cursor-pointer"
+                                    onClick={() => handleExpandOrder(o.id)}
+                                >
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-white text-xs font-semibold font-mono">
+                                                {o.invoiceNumber != null ? `#${String(o.invoiceNumber).padStart(4, '0')}` : `#${o.id.slice(0, 6)}`}
+                                            </p>
+                                            {o.createdAt?.seconds && (
+                                                <p className="text-slate-500 text-[10px]">
+                                                    {new Date(o.createdAt.seconds * 1000).toLocaleString('es-VE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <p className="text-slate-500 text-[10px]">{METHOD_LABELS[o.paymentMethod] || 'N/A'}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-blue-400 font-bold text-sm">{formatUSD(o.totalCents || 0)}</p>
+                                        <span className="text-slate-600 text-xs">{expandedOrderId === o.id ? '▲' : '▼'}</span>
+                                    </div>
                                 </div>
-                                <p className="text-blue-400 font-bold text-sm">{formatUSD(o.totalCents || 0)}</p>
+
+                                {expandedOrderId === o.id && (
+                                    <div className="border-t border-white/5 px-4 py-3 space-y-2">
+                                        {/* Cliente (órdenes hold) */}
+                                        {o.client && (
+                                            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                                                <span className="text-slate-400 text-xs">👤 {o.client.name}</span>
+                                                {o.client.phone && <span className="text-slate-500 text-xs">📱 {o.client.phone}</span>}
+                                            </div>
+                                        )}
+                                        {/* Ítems */}
+                                        {!orderItems[o.id]
+                                            ? <p className="text-slate-500 text-xs animate-pulse">Cargando...</p>
+                                            : orderItems[o.id].map(item => (
+                                                <div key={item.productId} className="flex justify-between text-xs">
+                                                    <span className="text-slate-300">
+                                                        {item.emoji} {item.name}
+                                                        <span className="text-slate-500 ml-1">x{item.qty}</span>
+                                                    </span>
+                                                    <span className="text-blue-400 font-bold">{formatUSD(item.subtotalCents)}</span>
+                                                </div>
+                                            ))
+                                        }
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -131,6 +261,14 @@ export default function ReportPage({ onBack }) {
                     <p className="text-sm">Sin ventas en esta sesión</p>
                 </div>
             )}
+
+            {/* Botón compartir WhatsApp */}
+            <button
+                onClick={handleShareWhatsApp}
+                className="w-full bg-green-600 hover:bg-green-500 active:scale-[0.98] text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+                📲 Compartir por WhatsApp
+            </button>
 
             {/* Botón cerrar caja */}
             {!confirm ? (

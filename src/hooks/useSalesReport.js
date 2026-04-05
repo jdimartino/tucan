@@ -1,7 +1,7 @@
 // src/hooks/useSalesReport.js
 // Consulta las órdenes de una sesión específica en tiempo real
 import { useState, useEffect } from 'react'
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export function useSalesReport(sessionId) {
@@ -18,8 +18,21 @@ export function useSalesReport(sessionId) {
             orderBy('createdAt', 'desc')
         )
 
-        const unsub = onSnapshot(q, (snap) => {
-            setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+        const unsub = onSnapshot(q, async (snap) => {
+            const rawOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+            // Para órdenes sin paymentMethod en el doc principal (creadas antes del fix),
+            // leer la subcollección payments/p1
+            const enriched = await Promise.all(rawOrders.map(async (o) => {
+                // Leer subcol si falta paymentMethod (orden antigua) o si es mixto (necesitamos paidUSD/paidBS)
+                const needsSubcol = !o.paymentMethod || o.paymentMethod === 'mixed'
+                if (!needsSubcol) return o
+                const paySnap = await getDocs(collection(db, 'orders', o.id, 'payments'))
+                const payData = paySnap.docs[0]?.data()
+                return { ...o, paymentMethod: o.paymentMethod || payData?.method, paymentData: payData }
+            }))
+
+            setOrders(enriched)
             setLoading(false)
         })
         return unsub

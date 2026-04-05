@@ -1,6 +1,6 @@
 // src/services/userService.js
 import {
-    doc, setDoc, updateDoc, serverTimestamp, collection,
+    doc, setDoc, updateDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import { db } from '../firebase'
@@ -24,4 +24,8 @@ export async function toggleUser(uid, active) {
 
 export async function updateUserName(uid, name) {
     return updateDoc(doc(db, 'users', uid), { name, updatedAt: serverTimestamp() })
+}
+
+export async function updateUser(uid, { name, role }) {
+    return updateDoc(doc(db, 'users', uid), { name, role, updatedAt: serverTimestamp() })
 }

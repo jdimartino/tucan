@@ -1,7 +1,7 @@
 // src/services/orderService.js
 import {
-    collection, addDoc, doc, setDoc, updateDoc,
-    serverTimestamp, query, where, getDocs, getDoc,
+    collection, doc, updateDoc,
+    serverTimestamp, query, where, getDocs,
     writeBatch, runTransaction,
 } from 'firebase/firestore'
 import { db } from '../firebase'
@@ -36,6 +36,7 @@ export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, p
         status: 'paid',
         mode: 'fast',
         totalCents: items.reduce((s, i) => s + i.subtotalCents, 0),
+        paymentMethod: payment.method,
         ...(invoiceNumber != null && { invoiceNumber }),
         createdAt: serverTimestamp(),
     })
@@ -117,12 +118,23 @@ export async function getOpenOrders(sessionId) {
  * 2. Lee los ítems de la subcol y los devuelve para cargarlos en el carrito
  */
 export async function reopenOrder(orderId) {
-    await updateDoc(doc(db, 'orders', orderId), {
-        status: 'processing',
-        updatedAt: serverTimestamp(),
-    })
     const itemsSnap = await getDocs(collection(db, 'orders', orderId, 'items'))
     return itemsSnap.docs.map(d => ({ productId: d.id, ...d.data() }))
+}
+
+export async function completeHoldOrder(orderId) {
+    return updateDoc(doc(db, 'orders', orderId), {
+        status: 'completed',
+        updatedAt: serverTimestamp(),
+    })
+}
+
+/**
+ * Lee los ítems de la subcol de una orden en espera.
+ */
+export async function getOrderItems(orderId) {
+    const snap = await getDocs(collection(db, 'orders', orderId, 'items'))
+    return snap.docs.map(d => ({ productId: d.id, ...d.data() }))
 }
 
 /**

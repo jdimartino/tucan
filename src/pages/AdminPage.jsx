@@ -5,6 +5,7 @@ import { auth } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 import { useSession } from '../context/SessionContext'
 import { useNav } from '../context/NavigationContext'
+import TucanIcon from '../components/TucanIcon'
 import ProductList from '../components/admin/ProductList'
 import UserList from '../components/admin/UserList'
 import SessionPanel from '../components/admin/SessionPanel'
@@ -19,16 +20,18 @@ const TABS = [
 
 export default function AdminPage() {
     const [activeTab, setActiveTab] = useState('products')
-    const { user } = useAuth()
+    const { user, role } = useAuth()
     const { session } = useSession()
     const { setScreen } = useNav()
 
+    if (role !== 'admin') return null
+
     return (
-        <div className="min-h-screen bg-[#0F172A] flex flex-col">
+        <div className="min-h-screen bg-[#1E1040] flex flex-col">
             {/* Header */}
-            <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+            <header className="bg-[#2E1B5C] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-2">
-                    <span className="text-2xl">🦜</span>
+                    <TucanIcon className="w-7 h-7" />
                     <div>
                         <p className="text-white font-bold text-sm leading-none">TucanApp Admin</p>
                         <p className="text-slate-500 text-[10px] leading-none mt-0.5">{user?.email}</p>
@@ -59,7 +62,7 @@ export default function AdminPage() {
 
             {/* Tabs */}
             <div className="px-4 pt-4">
-                <div className="flex gap-1 bg-[#1E293B] rounded-2xl p-1 overflow-x-auto">
+                <div className="flex gap-1 bg-[#2E1B5C] rounded-2xl p-1 overflow-x-auto">
                     {TABS.map(tab => (
                         <button
                             key={tab.id}

@@ -9,6 +9,7 @@ import { useNav } from '../context/NavigationContext'
 import { useProducts } from '../hooks/useProducts'
 import { useOpenOrders } from '../hooks/useOpenOrders'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import TucanIcon from '../components/TucanIcon'
 import { formatUSD } from '../utils/money'
 
 const ALL = 'Todos'
@@ -62,8 +63,8 @@ export default function POSPage() {
             {/* ── Header ── */}
             <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div>
-                    <p className="text-white font-bold text-sm leading-none">
-                        🦜 TucanApp POS
+                    <p className="text-white font-bold text-sm leading-none flex items-center gap-1">
+                        <TucanIcon className="w-4 h-4 inline-block" /> TucanApp POS
                         {!isOnline && (
                             <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/20">
                                 Offline
@@ -125,6 +126,19 @@ export default function POSPage() {
                 </div>
             </nav>
 
+            {/* ── Banner facturas en espera ── */}
+            {itemCount === 0 && holdCount > 0 && (
+                <div className="px-4 pb-2">
+                    <button
+                        onClick={() => setScreen('hold')}
+                        className="w-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold py-2 px-4 rounded-xl flex items-center justify-between transition-all hover:bg-amber-500/25 active:scale-[0.99] text-sm"
+                    >
+                        <span>⏳ {holdCount} factura{holdCount !== 1 ? 's' : ''} en espera</span>
+                        <span className="text-xs opacity-70">Ver →</span>
+                    </button>
+                </div>
+            )}
+
             {/* ── Grilla de Productos ── */}
             <main className="flex-1 px-4">
                 {loading ? (
@@ -167,13 +181,25 @@ export default function POSPage() {
                             <span className="text-slate-400 text-xs">{itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}</span>
                         </div>
 
-                        {/* Emojis + nombres horizontales */}
-                        <div className="w-full flex items-center justify-start gap-2 overflow-x-auto pb-1 scrollbar-none opacity-80">
+                        {/* Lista vertical de ítems */}
+                        <div className="w-full flex flex-col gap-1 max-h-28 overflow-y-auto">
                             {items.map(item => (
-                                <span key={item.productId} className="text-[10px] font-medium bg-white/5 border border-white/10 px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0 flex items-center gap-1 text-slate-300">
-                                    <span>{item.emoji}</span>
-                                    <span>{item.qty}x {item.name}</span>
-                                </span>
+                                <div key={item.productId} className="flex items-center justify-between px-1 gap-2">
+                                    <span className="text-xs text-slate-300 flex items-center gap-1.5 flex-1 min-w-0">
+                                        <span>{item.emoji}</span>
+                                        <span className="truncate">{item.qty}× {item.name}</span>
+                                    </span>
+                                    <span className="text-xs font-bold text-blue-400 shrink-0">
+                                        {formatUSD(item.subtotalCents)}
+                                    </span>
+                                    <button
+                                        onPointerDown={e => { e.stopPropagation(); dispatch({ type: 'DECREMENT_ITEM', payload: item.productId }) }}
+                                        className="shrink-0 w-5 h-5 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all text-xs font-bold leading-none flex items-center justify-center"
+                                        aria-label={`Quitar ${item.name}`}
+                                    >
+                                        −
+                                    </button>
+                                </div>
                             ))}
                         </div>
 
@@ -196,21 +222,6 @@ export default function POSPage() {
                 </div>
             )}
 
-            {/* ── Alert flotante de Facturas en Espera (Solo si no hay carrito activo) ── */}
-            {itemCount === 0 && holdCount > 0 && (
-                <div className="fixed top-16 left-0 right-0 z-20 px-4 py-2 pointer-events-none">
-                    <div className="flex justify-end">
-                        <button
-                            onClick={() => setScreen('hold')}
-                            aria-label={`Ver ${holdCount} facturas en espera`}
-                            className="pointer-events-auto bg-amber-500 hover:bg-amber-400 text-[#0F172A] font-bold py-1.5 px-4 rounded-full shadow-lg transition-all flex items-center gap-1.5 active:scale-95 text-xs"
-                        >
-                            <span>⏳</span>
-                            <span>{holdCount} factura{holdCount !== 1 ? 's' : ''} en espera</span>
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
