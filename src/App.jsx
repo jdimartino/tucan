@@ -5,12 +5,26 @@ import { CartProvider } from './context/CartContext'
 import { NavigationProvider, useNav } from './context/NavigationContext'
 import { ToastProvider } from './components/Toast'
 import ErrorBoundary from './components/ErrorBoundary'
+import { useSessionSync } from './hooks/useSessionSync'
 import LoginPage from './pages/LoginPage'
 import POSPage from './pages/POSPage'
 import TicketPage from './pages/TicketPage'
 import SuccessPage from './pages/SuccessPage'
 import AdminPage from './pages/AdminPage'
 import HoldPage from './pages/HoldPage'
+
+// Recupera sesión de Firestore si localStorage fue limpiado
+function SessionGate({ children }) {
+  const { recovering } = useSessionSync()
+  if (recovering) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+  return children
+}
 
 // Router interno del cajero (pos → ticket → success)
 function CashierRouter() {
@@ -31,11 +45,13 @@ function AppRouter() {
   if (role === 'admin') {
     return (
       <SessionProvider>
-        <CartProvider>
-          <NavigationProvider>
-            <AdminOrPOS />
-          </NavigationProvider>
-        </CartProvider>
+        <SessionGate>
+          <CartProvider>
+            <NavigationProvider>
+              <AdminOrPOS />
+            </NavigationProvider>
+          </CartProvider>
+        </SessionGate>
       </SessionProvider>
     )
   }
@@ -43,11 +59,13 @@ function AppRouter() {
   // Cajero → flujo POS
   return (
     <SessionProvider>
-      <CartProvider>
-        <NavigationProvider>
-          <CashierRouter />
-        </NavigationProvider>
-      </CartProvider>
+      <SessionGate>
+        <CartProvider>
+          <NavigationProvider>
+            <CashierRouter />
+          </NavigationProvider>
+        </CartProvider>
+      </SessionGate>
     </SessionProvider>
   )
 }
