@@ -45,7 +45,7 @@
           "order": "DESCENDING"
         }
       ]
-    }
+    },
     {
       "collectionGroup": "sessions",
       "queryScope": "COLLECTION",
