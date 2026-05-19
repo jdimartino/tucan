@@ -21,10 +21,7 @@ export function useSalesReport(sessionId) {
         const unsub = onSnapshot(q, async (snap) => {
             const rawOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-            // Para órdenes sin paymentMethod en el doc principal (creadas antes del fix),
-            // leer la subcollección payments/p1
             const enriched = await Promise.all(rawOrders.map(async (o) => {
-                // Leer subcol si falta paymentMethod (orden antigua) o si es mixto (necesitamos paidUSD/paidBS)
                 const needsSubcol = !o.paymentMethod || o.paymentMethod === 'mixed'
                 if (!needsSubcol) return o
                 const paySnap = await getDocs(collection(db, 'orders', o.id, 'payments'))
@@ -38,10 +35,9 @@ export function useSalesReport(sessionId) {
         return unsub
     }, [sessionId])
 
-    // Totales calculados
     const totalCents = orders.reduce((s, o) => s + (o.totalCents || 0), 0)
-    const totalUSD = totalCents / 100
+    const totalBs = totalCents / 100
     const totalTx = orders.length
 
-    return { orders, loading, totalCents, totalUSD, totalTx }
+    return { orders, loading, totalCents, totalBs, totalTx }
 }

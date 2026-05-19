@@ -24,7 +24,7 @@ export async function nextInvoiceNumber() {
  * Guarda una orden completa en Firestore usando writeBatch (atómica).
  * Estructura: orders/{id} + subcol items/{} + subcol payments/{}
  */
-export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, payment, invoiceNumber }) {
+export async function saveOrder({ cashierId, sessionId, items, payment, invoiceNumber }) {
     // 1. Crear doc principal de la orden
     const orderRef = doc(collection(db, 'orders'))
     const batch = writeBatch(db)
@@ -32,7 +32,6 @@ export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, p
     batch.set(orderRef, {
         cashierId,
         sessionId,
-        rateAtTime: exchangeRateBs,
         status: 'paid',
         mode: 'fast',
         totalCents: items.reduce((s, i) => s + i.subtotalCents, 0),
@@ -68,14 +67,13 @@ export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, p
  * Guarda una Factura en Espera (cuenta abierta) en Firestore usando writeBatch.
  * mode: 'tab' / status: 'open'
  */
-export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, items, client }) {
+export async function saveHoldOrder({ cashierId, sessionId, items, client }) {
     const orderRef = doc(collection(db, 'orders'))
     const batch = writeBatch(db)
 
     batch.set(orderRef, {
         cashierId,
         sessionId,
-        rateAtTime: exchangeRateBs,
         status: 'open',
         mode: 'tab',
         client: { name: client.name.trim(), phone: client.phone.trim() },

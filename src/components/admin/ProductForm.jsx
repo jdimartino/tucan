@@ -1,15 +1,15 @@
 // src/components/admin/ProductForm.jsx
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createProduct, updateProduct } from '../../services/productService'
 
 const CATEGORIES = ['Bebidas Sin Alcohol', 'Cervezas', 'Cocteles', 'Shots', 'Licores', 'Snacks', 'Otros']
 
 const EMOJIS = ['🍺', '🍻', '🍹', '🥃', '🍸', '🧃', '🥤', '🍷', '🫧', '🥨', '🍟', '🌮', '🍕', '☕', '🧋']
 
-const empty = { name: '', emoji: '🍺', category: 'Bebidas Sin Alcohol', priceUSD: '', active: true }
+const empty = { name: '', emoji: '🍺', category: 'Bebidas Sin Alcohol', priceBS: '', active: true }
 
 export default function ProductForm({ product, onClose }) {
-    const [form, setForm] = useState(product ? { ...product, priceUSD: product.priceUSD.toString() } : empty)
+    const [form, setForm] = useState(product ? { ...product, priceBS: product.priceBS.toString() } : empty)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
     const editing = !!product
@@ -18,11 +18,11 @@ export default function ProductForm({ product, onClose }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
-        const price = parseFloat(form.priceUSD)
+        const price = parseFloat(form.priceBS)
         if (isNaN(price) || price <= 0) { setError('El precio debe ser mayor a 0'); return }
         setSaving(true)
         try {
-            const payload = { ...form, priceUSD: price }
+            const payload = { ...form, priceBS: price }
             if (editing) await updateProduct(product.id, payload)
             else await createProduct(payload)
             onClose()
@@ -83,17 +83,17 @@ export default function ProductForm({ product, onClose }) {
                         </select>
                     </div>
 
-                    {/* Precio USD */}
+                    {/* Precio */}
                     <div>
-                        <label className="label-xs">Precio (USD)</label>
+                        <label className="label-xs">Precio (Bs.)</label>
                         <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
                             <input
                                 type="number" step="0.01" min="0.01"
-                                value={form.priceUSD}
-                                onChange={e => set('priceUSD', e.target.value)}
-                                className="input-field pl-8"
-                                placeholder="0.00"
+                                value={form.priceBS}
+                                onChange={e => set('priceBS', e.target.value)}
+                                className="input-field pl-10"
+                                placeholder="0,00"
                                 required
                             />
                         </div>

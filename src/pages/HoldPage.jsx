@@ -2,17 +2,16 @@
 import { useState } from 'react'
 import { useCart } from '../context/CartContext'
 import { useSession } from '../context/SessionContext'
-import { useAuth } from '../context/AuthContext'
+import { DEFAULT_USER } from '../context/AuthContext'
 import { useNav } from '../context/NavigationContext'
 import { useOpenOrders } from '../hooks/useOpenOrders'
 import { saveHoldOrder, reopenOrder, cancelHoldOrder, appendHoldOrder, getOrderItems } from '../services/orderService'
-import { formatUSD, formatBsNum, fromCents } from '../utils/money'
+import { formatBs } from '../utils/money'
 import { useToast } from '../components/Toast'
 
 export default function HoldPage() {
     const { items, totalCents, dispatch } = useCart()
     const { session } = useSession()
-    const { user } = useAuth()
     const { setScreen, setHoldOrderId } = useNav()
     const { orders, loading } = useOpenOrders(session?.id)
     const toast = useToast()
@@ -26,7 +25,7 @@ export default function HoldPage() {
     const [expandedOrderId, setExpandedOrderId] = useState(null)
     const [orderItems, setOrderItems] = useState({})
 
-    const rate = session?.exchangeRateBs || 1
+    // (rate removed — single currency)
     const hasItems = items.length > 0
 
     const canSaveNew = name.trim().length >= 2 && phone.trim().length >= 7 && hasItems && session?.id
@@ -39,9 +38,8 @@ export default function HoldPage() {
         try {
             if (assignMode === 'new' || orders.length === 0) {
                 await saveHoldOrder({
-                    cashierId: user.uid,
+                    cashierId: DEFAULT_USER.uid,
                     sessionId: session.id,
-                    exchangeRateBs: rate,
                     items,
                     client: { name, phone },
                 })
@@ -75,7 +73,7 @@ export default function HoldPage() {
                             id: item.productId,
                             name: item.name,
                             emoji: item.emoji,
-                            priceUSD: item.unitPriceCents / 100,
+                            priceBS: item.unitPriceCents / 100,
                         },
                     })
                 }
@@ -95,7 +93,7 @@ export default function HoldPage() {
         try {
             await cancelHoldOrder(orderId)
             toast.success('Cuenta cancelada')
-        } catch (err) {
+        } catch {
             toast.error('Error al cancelar la cuenta.')
         }
     }
@@ -111,12 +109,11 @@ export default function HoldPage() {
 
     const handleNotify = (order, items) => {
         const phone = order.client?.phone?.replace(/^0/, '58')
-        const totalUSD = formatUSD(order.totalCents)
-        const totalBs = formatBsNum(fromCents(order.totalCents) * rate)
+        const totalBs = formatBs(order.totalCents)
         const lines = (items || [])
-            .map(i => `${i.emoji} ${i.name} x${i.qty} — $${(i.subtotalCents / 100).toFixed(2)}`)
+            .map(i => `${i.emoji} ${i.name} x${i.qty} — ${formatBs(i.subtotalCents)}`)
             .join('\n')
-        const msg = `🦜 *TucanApp* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:\n\n${lines || '(sin detalle cargado)'}\n\n💵 *Total: ${totalUSD}*\n💴 *Bs ${totalBs}*\n\nGracias por tu visita 🙏`
+        const msg = `🐷 *Cochinitos* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:\n\n${lines || '(sin detalle cargado)'}\n\n💵 *Total: ${totalBs}*\n\nGracias por tu visita 🙏`
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
@@ -133,7 +130,7 @@ export default function HoldPage() {
             <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div>
                     <p className="text-white font-bold text-sm leading-none">⏳ Factura en Espera</p>
-                    <p className="text-slate-500 text-[10px] mt-0.5">Guarda o retoma una cuenta</p>
+                    <p className="text-slate-500 text-[11px] mt-0.5">Guarda o retoma una cuenta</p>
                 </div>
                 <button
                     onClick={() => setScreen('pos')}
@@ -152,14 +149,14 @@ export default function HoldPage() {
                         <h2 className="text-white font-bold text-sm mb-3">
                             💾 Guardar cuenta actual
                             <span className="text-slate-500 font-normal ml-2 text-xs">
-                                {items.length} producto{items.length !== 1 ? 's' : ''} · {formatUSD(totalCents)}
+                                {items.length} producto{items.length !== 1 ? 's' : ''} · {formatBs(totalCents)}
                             </span>
                         </h2>
 
                         {/* Mini resumen del carrito */}
                         <div className="flex flex-wrap gap-1.5 mb-4">
                             {items.map(item => (
-                                <span key={item.productId} className="text-[10px] bg-white/5 border border-white/10 text-slate-300 px-2 py-1 rounded-full flex items-center gap-1">
+                                <span key={item.productId} className="text-[11px] bg-white/5 border border-white/10 text-slate-300 px-2 py-1 rounded-full flex items-center gap-1">
                                     {item.emoji} {item.qty}x {item.name}
                                 </span>
                             ))}
@@ -225,7 +222,7 @@ export default function HoldPage() {
                                         <option value="" disabled>-- Elige un cliente --</option>
                                         {orders.map(o => (
                                             <option key={o.id} value={o.id}>
-                                                {o.client?.name} (Lleva: {formatUSD(o.totalCents)})
+                                                {o.client?.name} (Lleva: {formatBs(o.totalCents)})
                                             </option>
                                         ))}
                                     </select>
@@ -255,7 +252,7 @@ export default function HoldPage() {
                     <h2 className="text-white font-bold text-sm mb-3 px-1">
                         📋 Cuentas abiertas
                         {orders.length > 0 && (
-                            <span className="ml-2 bg-amber-500/20 text-amber-400 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                            <span className="ml-2 bg-amber-500/20 text-amber-400 text-[11px] font-extrabold px-2 py-0.5 rounded-full">
                                 {orders.length}
                             </span>
                         )}
@@ -286,11 +283,8 @@ export default function HoldPage() {
                                     <p className="text-slate-500 text-xs mt-0.5">📱 {order.client?.phone}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-blue-400 font-extrabold">{formatUSD(order.totalCents)}</p>
-                                    <p className="text-amber-400 text-xs font-bold">
-                                        Bs {formatBsNum(fromCents(order.totalCents) * rate)}
-                                    </p>
-                                    <p className="text-slate-600 text-[10px] mt-0.5">{formatTime(order.createdAt)}</p>
+                                    <p className="text-blue-400 font-extrabold">{formatBs(order.totalCents)}</p>
+                                    <p className="text-slate-600 text-[11px] mt-0.5">{formatTime(order.createdAt)}</p>
                                 </div>
                             </div>
 
@@ -306,7 +300,7 @@ export default function HoldPage() {
                                                     <span className="text-slate-500 ml-1">x{item.qty}</span>
                                                 </span>
                                                 <span className="text-blue-400 font-bold">
-                                                    ${(item.subtotalCents / 100).toFixed(2)}
+                                                    {formatBs(item.subtotalCents)}
                                                 </span>
                                             </div>
                                         ))

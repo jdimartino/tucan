@@ -1,16 +1,34 @@
-# React + Vite
+# Cochinitos POS
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema de punto de venta para barras y restaurantes.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend:** React 19 + Vite 7 + TailwindCSS 4
+- **Backend:** Firebase Firestore (NoSQL, offline-first)
+- **PWA:** Instalable en iOS/Android
 
-## React Compiler
+## Scripts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm run dev      # Servidor de desarrollo
+npm run build    # Build de producción
+npm run lint     # ESLint
+npm run preview  # Preview del build
+```
 
-## Expanding the ESLint configuration
+## Estructura
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```
+src/
+  components/   # Componentes reutilizables (LogoIcon, Toast, ErrorBoundary, admin/)
+  context/      # Contextos de React (Auth, Cart, Navigation, Session)
+  hooks/        # Custom hooks (useProducts, useOpenOrders, useSalesReport, etc.)
+  pages/        # Páginas (POS, Ticket, Success, Hold, Admin, Report)
+  services/     # Lógica de Firestore (órdenes, productos, sesiones)
+  utils/        # Utilidades (money.js)
+```
+
+## Licencia
+
+Privado — Todos los derechos reservados.

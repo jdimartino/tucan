@@ -3,7 +3,6 @@ import { createContext, useContext, useReducer } from 'react'
 
 const CartContext = createContext(null)
 
-// Cálculos en centavos para evitar errores de float
 function cartReducer(state, action) {
     switch (action.type) {
         case 'ADD_ITEM': {
@@ -18,7 +17,7 @@ function cartReducer(state, action) {
                     ),
                 }
             }
-            const unitPriceCents = Math.round(action.payload.priceUSD * 100)
+            const unitPriceCents = Math.round(action.payload.priceBS * 100)
             return {
                 ...state,
                 items: [...state.items, {
@@ -54,11 +53,11 @@ export function CartProvider({ children }) {
     const [state, dispatch] = useReducer(cartReducer, { items: [] })
 
     const totalCents = state.items.reduce((sum, i) => sum + i.subtotalCents, 0)
-    const totalUSD = totalCents / 100
+    const totalBs = totalCents / 100
     const itemCount = state.items.reduce((sum, i) => sum + i.qty, 0)
 
     return (
-        <CartContext.Provider value={{ items: state.items, totalCents, totalUSD, itemCount, dispatch }}>
+        <CartContext.Provider value={{ items: state.items, totalCents, totalBs, itemCount, dispatch }}>
             {children}
         </CartContext.Provider>
     )

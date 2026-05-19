@@ -1,7 +1,5 @@
 // src/pages/POSPage.jsx
 import { useState, useMemo } from 'react'
-import { signOut } from 'firebase/auth'
-import { auth } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 import { useSession } from '../context/SessionContext'
 import { useCart } from '../context/CartContext'
@@ -9,13 +7,13 @@ import { useNav } from '../context/NavigationContext'
 import { useProducts } from '../hooks/useProducts'
 import { useOpenOrders } from '../hooks/useOpenOrders'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
-import TucanIcon from '../components/TucanIcon'
-import { formatUSD } from '../utils/money'
+import LogoIcon from '../components/LogoIcon'
+import { formatBs } from '../utils/money'
 
 const ALL = 'Todos'
 
 export default function POSPage() {
-    const { user, role } = useAuth()
+    const { role } = useAuth()
     const { session } = useSession()
     const { items, totalCents, itemCount, dispatch } = useCart()
     const { setScreen } = useNav()
@@ -49,9 +47,6 @@ export default function POSPage() {
                             ⚙️ Ir al Panel Admin
                         </button>
                     )}
-                    <button onClick={() => signOut(auth)} className="btn-secondary text-sm">
-                        ← Cerrar Sesión
-                    </button>
                 </div>
             </div>
         )
@@ -64,46 +59,34 @@ export default function POSPage() {
             <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div>
                     <p className="text-white font-bold text-sm leading-none flex items-center gap-1">
-                        <TucanIcon className="w-4 h-4 inline-block" /> TucanApp POS
+                        <LogoIcon className="w-4 h-4 inline-block" /> Cochinitos POS
                         {!isOnline && (
-                            <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/20">
+                            <span className="ml-2 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/20">
                                 Offline
                             </span>
                         )}
                     </p>
-                    <p className="text-slate-500 text-[10px] leading-none mt-0.5">{user?.email}</p>
+                    <p className="text-slate-500 text-[11px] leading-none mt-0.5">admin@cochinitos.app</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {holdCount > 0 && (
                         <button
                             onClick={() => setScreen('hold')}
                             aria-label={`${holdCount} facturas en espera`}
-                            className="bg-amber-500/20 text-amber-400 text-[10px] sm:text-xs font-extrabold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full flex items-center gap-1 hover:bg-amber-500/30 transition-colors"
+                            className="bg-amber-500/20 text-amber-400 text-[11px] sm:text-xs font-extrabold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full flex items-center gap-1 hover:bg-amber-500/30 transition-colors"
                         >
                             ⏳ <span className="hidden sm:inline">En espera:</span> {holdCount}
                         </button>
-                    )}
-                    {session?.exchangeRateBs && (
-                        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
-                            Bs {session.exchangeRateBs}/$
-                        </span>
                     )}
                     {role === 'admin' && (
                         <button
                             onClick={() => setScreen?.('admin')}
                             aria-label="Panel de administración"
-                            className="text-xs text-slate-400 hover:text-blue-400 transition-colors font-semibold px-2 py-1 rounded-lg hover:bg-blue-500/10"
+                            className="text-sm text-slate-400 hover:text-blue-400 transition-colors font-semibold px-3 py-2 rounded-lg hover:bg-blue-500/10"
                         >
                             ⚙️
                         </button>
                     )}
-                    <button
-                        onClick={() => signOut(auth)}
-                        aria-label="Cerrar sesión"
-                        className="text-xs text-slate-400 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 font-semibold"
-                    >
-                        Salir
-                    </button>
                 </div>
             </header>
 
@@ -161,7 +144,6 @@ export default function POSPage() {
                                 key={product.id}
                                 product={product}
                                 qty={items.find(i => i.productId === product.id)?.qty || 0}
-                                rate={session?.exchangeRateBs || 0}
                                 onAdd={() => dispatch({ type: 'ADD_ITEM', payload: product })}
                                 onRemove={() => dispatch({ type: 'DECREMENT_ITEM', payload: product.id })}
                             />
@@ -172,12 +154,12 @@ export default function POSPage() {
 
             {/* ── Cart Bar flotante inferior ── */}
             {itemCount > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 z-20 p-4">
+                <div className="fixed bottom-0 left-0 right-0 z-20 p-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
                     <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-3 shadow-2xl flex flex-col gap-2">
 
                         {/* Info: ítems + emojis + total */}
                         <div className="flex items-center justify-between px-1">
-                            <span className="text-white font-extrabold text-lg leading-none">{formatUSD(totalCents)}</span>
+                            <span className="text-white font-extrabold text-lg leading-none">{formatBs(totalCents)}</span>
                             <span className="text-slate-400 text-xs">{itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}</span>
                         </div>
 
@@ -190,11 +172,11 @@ export default function POSPage() {
                                         <span className="truncate">{item.qty}× {item.name}</span>
                                     </span>
                                     <span className="text-xs font-bold text-blue-400 shrink-0">
-                                        {formatUSD(item.subtotalCents)}
+                                        {formatBs(item.subtotalCents)}
                                     </span>
                                     <button
                                         onPointerDown={e => { e.stopPropagation(); dispatch({ type: 'DECREMENT_ITEM', payload: item.productId }) }}
-                                        className="shrink-0 w-5 h-5 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all text-xs font-bold leading-none flex items-center justify-center"
+                                        className="shrink-0 w-10 h-10 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all text-lg font-bold leading-none flex items-center justify-center"
                                         aria-label={`Quitar ${item.name}`}
                                     >
                                         −
@@ -215,7 +197,7 @@ export default function POSPage() {
                                 onClick={() => setScreen('ticket')}
                                 className="flex-[2] bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-extrabold py-3 px-5 rounded-xl transition-all shadow-lg shadow-blue-600/30 text-sm"
                             >
-                                💳 Cobrar {formatUSD(totalCents)}
+                                💳 Cobrar {formatBs(totalCents)}
                             </button>
                         </div>
                     </div>
@@ -227,22 +209,19 @@ export default function POSPage() {
 }
 
 /* ── Componente ProductCard ── */
-function ProductCard({ product, qty, rate, onAdd, onRemove }) {
-    const bsPrice = rate > 0 ? `Bs ${(product.priceUSD * rate).toFixed(0)}` : null
-
+function ProductCard({ product, qty, onAdd, onRemove }) {
     return (
         <div className={`bg-[#1E293B] rounded-2xl p-3 relative flex flex-col transition-all border ${qty > 0 ? 'border-blue-500/40' : 'border-white/5'}`}>
             {/* Badge cantidad */}
             {qty > 0 && (
-                <span className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                <span className="absolute top-2 right-2 bg-blue-600 text-white text-[11px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
                     {qty}
                 </span>
             )}
 
             <div className="text-3xl text-center mt-1 mb-2">{product.emoji}</div>
             <p className="text-white text-xs font-semibold text-center leading-tight mb-0.5 line-clamp-2">{product.name}</p>
-            <p className="text-blue-400 text-sm font-extrabold text-center">${product.priceUSD.toFixed(2)}</p>
-            {bsPrice && <p className="text-amber-400 font-bold text-[10px] text-center mb-2">{bsPrice}</p>}
+            <p className="text-blue-400 text-sm font-extrabold text-center mb-2">Bs {(product.priceBS || 0).toFixed(2)}</p>
 
             <div className="mt-auto pt-2 flex gap-1">
                 {qty > 0 ? (

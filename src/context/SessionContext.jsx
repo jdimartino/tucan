@@ -2,7 +2,7 @@
 import { createContext, useContext, useState } from 'react'
 
 const SessionContext = createContext(null)
-const LS_KEY = 'tucan_session'
+const LS_KEY = 'cochinitos_session'
 
 export function SessionProvider({ children }) {
     const [session, setSessionState] = useState(() => {

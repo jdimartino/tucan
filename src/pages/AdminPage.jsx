@@ -1,26 +1,22 @@
 // src/pages/AdminPage.jsx
 import { useState } from 'react'
-import { signOut } from 'firebase/auth'
-import { auth } from '../firebase'
 import { useAuth } from '../context/AuthContext'
 import { useSession } from '../context/SessionContext'
 import { useNav } from '../context/NavigationContext'
-import TucanIcon from '../components/TucanIcon'
+import LogoIcon from '../components/LogoIcon'
 import ProductList from '../components/admin/ProductList'
-import UserList from '../components/admin/UserList'
 import SessionPanel from '../components/admin/SessionPanel'
 import ReportPage from './ReportPage'
 
 const TABS = [
     { id: 'products', label: '📦 Productos' },
-    { id: 'users', label: '👥 Usuarios' },
     { id: 'caja', label: '🏪 Caja' },
     { id: 'report', label: '📊 Reporte' },
 ]
 
 export default function AdminPage() {
     const [activeTab, setActiveTab] = useState('products')
-    const { user, role } = useAuth()
+    const { role } = useAuth()
     const { session } = useSession()
     const { setScreen } = useNav()
 
@@ -31,32 +27,21 @@ export default function AdminPage() {
             {/* Header */}
             <header className="bg-[#2E1B5C] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-2">
-                    <TucanIcon className="w-7 h-7" />
+                    <LogoIcon className="w-7 h-7" />
                     <div>
-                        <p className="text-white font-bold text-sm leading-none">TucanApp Admin</p>
-                        <p className="text-slate-500 text-[10px] leading-none mt-0.5">{user?.email}</p>
+                        <p className="text-white font-bold text-sm leading-none">Cochinitos Admin</p>
+                        <p className="text-slate-500 text-[11px] leading-none mt-0.5">admin@cochinitos.app</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     {session?.status === 'open' && (
-                        <>
-                            <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/20">
-                                Bs {session.exchangeRateBs}/$
-                            </span>
-                            <button
-                                onClick={() => setScreen('pos')}
-                                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
-                            >
-                                🏠 POS
-                            </button>
-                        </>
+                        <button
+                            onClick={() => setScreen('pos')}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+                        >
+                            🏠 POS
+                        </button>
                     )}
-                    <button
-                        onClick={() => signOut(auth)}
-                        className="text-xs text-slate-400 hover:text-red-400 transition-colors font-semibold px-2 py-1 rounded-lg hover:bg-red-500/10"
-                    >
-                        Salir
-                    </button>
                 </div>
             </header>
 
@@ -81,7 +66,6 @@ export default function AdminPage() {
             {/* Content */}
             <main className="flex-1 p-4 overflow-auto">
                 {activeTab === 'products' && <ProductList />}
-                {activeTab === 'users' && <UserList />}
                 {activeTab === 'caja' && <SessionPanel onSessionOpen={() => setActiveTab('products')} />}
                 {activeTab === 'report' && <ReportPage onBack={() => setActiveTab('caja')} />}
             </main>

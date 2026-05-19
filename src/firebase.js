@@ -1,9 +1,8 @@
-// src/firebase.js — TucanApp POS
-// Proyecto: tucanapp-pos · Configuración real
+// src/firebase.js — Cochinitos POS
+// Proyecto: cochinitos-pos
 
 import { initializeApp } from 'firebase/app'
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
-import { getAuth } from 'firebase/auth'
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,13 +14,10 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
 
-
 const app = initializeApp(firebaseConfig)
 
 export const db = getFirestore(app)
-export const auth = getAuth(app)
 
-// Persistencia offline (Firestore offline-first)
 enableIndexedDbPersistence(db).catch((err) => {
     if (err.code === 'failed-precondition') {
         console.warn('Firestore offline: múltiples pestañas abiertas')

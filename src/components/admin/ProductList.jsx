@@ -4,6 +4,7 @@ import { useProducts } from '../../hooks/useProducts'
 import { deleteProduct, toggleProduct } from '../../services/productService'
 import ProductForm from './ProductForm'
 import { useToast } from '../Toast'
+import { formatBsNum } from '../../utils/money'
 
 export default function ProductList() {
     const { products, loading } = useProducts()
@@ -83,14 +84,14 @@ export default function ProductList() {
                                     <span className="text-2xl">{p.emoji}</span>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-white font-semibold text-sm truncate">{p.name}</p>
-                                        <p className="text-slate-400 text-xs">${p.priceUSD.toFixed(2)}</p>
+                                        <p className="text-slate-400 text-xs">Bs {formatBsNum(p.priceBS)}</p>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         {/* Toggle activo */}
                                         <button
                                             onClick={() => toggleProduct(p.id, !p.active)}
                                             aria-label={p.active ? `Desactivar ${p.name}` : `Activar ${p.name}`}
-                                            className={`text-xs px-2 py-1 rounded-lg font-bold transition-colors ${p.active ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                                            className={`text-[11px] px-3 py-2.5 rounded-lg font-bold transition-colors ${p.active ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                                         >
                                             {p.active ? '✓ Activo' : '○ Inactivo'}
                                         </button>
@@ -98,17 +99,17 @@ export default function ProductList() {
                                         <button
                                             onClick={() => { setEditing(p); setShowForm(true) }}
                                             aria-label={`Editar ${p.name}`}
-                                            className="text-xs px-2 py-1 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 font-bold transition-colors"
+                                            className="text-[11px] px-3 py-2.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 font-bold transition-colors"
                                         >
-                                            ✏️
+                                            ✏️ Editar
                                         </button>
                                         {/* Eliminar */}
                                         <button
                                             onClick={() => setConfirm(p.id)}
                                             aria-label={`Eliminar ${p.name}`}
-                                            className="text-xs px-2 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-colors"
+                                            className="text-[11px] px-3 py-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-colors"
                                         >
-                                            🗑️
+                                            🗑️ Eliminar
                                         </button>
                                     </div>
                                 </div>

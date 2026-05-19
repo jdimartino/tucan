@@ -1,12 +1,10 @@
 // src/pages/SuccessPage.jsx
 import { useNav } from '../context/NavigationContext'
-import { useSession } from '../context/SessionContext'
-import { formatUSD } from '../utils/money'
-import TucanIcon from '../components/TucanIcon'
+import { formatBs } from '../utils/money'
+import LogoIcon from '../components/LogoIcon'
 
 export default function SuccessPage() {
     const { setScreen, lastOrderId, lastOrderData } = useNav()
-    const { session } = useSession()
 
     return (
         <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-center">
@@ -20,7 +18,7 @@ export default function SuccessPage() {
                 </div>
             </div>
 
-            <h1 className="text-white text-2xl font-extrabold mb-2">¡Pago Exitoso!</h1>
+            <h1 className="text-white text-2xl font-extrabold mb-2">Pago Exitoso!</h1>
             <p className="text-slate-400 text-sm mb-8">La venta ha sido registrada correctamente.</p>
 
             {/* Detalles de la orden */}
@@ -29,12 +27,6 @@ export default function SuccessPage() {
                     <p className="text-slate-400 font-bold uppercase tracking-wider">Número de Orden</p>
                     <p className="text-white font-mono truncate ml-2 max-w-[140px]">{lastOrderId?.slice(0, 8) || '—'}</p>
                 </div>
-                {session?.exchangeRateBs && (
-                    <div className="flex justify-between items-center text-xs">
-                        <p className="text-slate-400 font-bold uppercase tracking-wider">Tasa del día</p>
-                        <p className="text-white">Bs {session.exchangeRateBs} / $1</p>
-                    </div>
-                )}
 
                 {/* --- Montos Totales --- */}
                 {lastOrderData && (
@@ -42,20 +34,14 @@ export default function SuccessPage() {
                         <div className="flex justify-between">
                             <p className="text-slate-400 font-bold uppercase tracking-wider">Monto Total</p>
                             <p className="text-blue-400 font-extrabold text-sm">
-                                ${(lastOrderData.totalCents / 100).toFixed(2)}
+                                {formatBs(lastOrderData.totalCents)}
                             </p>
                         </div>
                         {lastOrderData.payment && (
                             <>
-                                {lastOrderData.payment.paidUSD > 0 && (
-                                    <div className="flex justify-between">
-                                        <p className="text-slate-500 font-semibold">Pagado USD</p>
-                                        <p className="text-slate-300 font-bold">${lastOrderData.payment.paidUSD.toFixed(2)}</p>
-                                    </div>
-                                )}
                                 {lastOrderData.payment.paidBS > 0 && (
                                     <div className="flex justify-between">
-                                        <p className="text-slate-500 font-semibold">Pagado BS</p>
+                                        <p className="text-slate-500 font-semibold">Pagado</p>
                                         <p className="text-slate-300 font-bold">Bs {lastOrderData.payment.paidBS.toFixed(2)}</p>
                                     </div>
                                 )}
@@ -76,7 +62,7 @@ export default function SuccessPage() {
                                         <span className="text-slate-500">x{item.qty}</span>
                                     </span>
                                     <span className="text-slate-400 font-mono">
-                                        {formatUSD(item.subtotalCents)}
+                                        {formatBs(item.subtotalCents)}
                                     </span>
                                 </div>
                             ))}
@@ -95,7 +81,7 @@ export default function SuccessPage() {
                 onClick={() => setScreen('pos')}
                 className="w-full max-w-sm bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-xl shadow-blue-600/30 text-lg"
             >
-                <TucanIcon className="inline-block w-5 h-5 mr-1 align-middle" /> Nueva Venta
+                <LogoIcon className="inline-block w-5 h-5 mr-1 align-middle" /> Nueva Venta
             </button>
 
             <p className="text-slate-600 text-xs mt-6">
