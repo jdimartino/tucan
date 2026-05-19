@@ -1,4 +1,4 @@
-// src/context/AuthContext.jsx — Cochinitos POS
+// src/context/AuthContext.jsx — Los 3 Cochinitos POS
 // Usuario único hardcodeado "admin" — sin Firebase Auth
 import { createContext } from 'react'
 

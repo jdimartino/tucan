@@ -1,4 +1,4 @@
-# Cochinitos POS
+# Los 3 Cochinitos POS
 
 Sistema de punto de venta para barras y restaurantes.
 

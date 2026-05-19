@@ -67,7 +67,7 @@ export async function saveOrder({ cashierId, sessionId, items, payment, invoiceN
  * Guarda una Factura en Espera (cuenta abierta) en Firestore usando writeBatch.
  * mode: 'tab' / status: 'open'
  */
-export async function saveHoldOrder({ cashierId, sessionId, items, client }) {
+export async function saveHoldOrder({ cashierId, sessionId, items, client, notes }) {
     const orderRef = doc(collection(db, 'orders'))
     const batch = writeBatch(db)
 
@@ -77,6 +77,7 @@ export async function saveHoldOrder({ cashierId, sessionId, items, client }) {
         status: 'open',
         mode: 'tab',
         client: { name: client.name.trim(), phone: client.phone.trim() },
+        notes: notes?.trim() || '',
         totalCents: items.reduce((s, i) => s + i.subtotalCents, 0),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

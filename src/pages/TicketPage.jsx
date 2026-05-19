@@ -10,10 +10,17 @@ import { useToast } from '../components/Toast'
 
 const METHODS = [
     { id: 'bs_cash', label: 'Efectivo Bs.', icon: '💴' },
-    { id: 'transfer', label: 'Transferencia', icon: '📲' },
+    { id: 'transfer', label: 'Pago Móvil', icon: '📲' },
     { id: 'pos_term', label: 'Punto de Venta', icon: '💳' },
     { id: 'usd_cash', label: 'Efectivo USD', icon: '💵' },
-    { id: 'mixed', label: 'Efectivo + POS', icon: '🔀' },
+    { id: 'mixed', label: 'Combinado', icon: '🔀' },
+]
+
+const MIXED_OPTIONS = [
+    { id: 'bs_cash', label: 'Efectivo Bs.', icon: '💴' },
+    { id: 'transfer', label: 'Pago Móvil', icon: '📲' },
+    { id: 'pos_term', label: 'Punto de Venta', icon: '💳' },
+    { id: 'usd_cash', label: 'Efectivo USD', icon: '💵' },
 ]
 
 export default function TicketPage() {
@@ -22,31 +29,43 @@ export default function TicketPage() {
     const { setScreen, setOrderId, setLastOrderData, holdOrderId, setHoldOrderId } = useNav()
     const toast = useToast()
 
-    const [method, setMethod] = useState('bs_cash')
+    const [method, setMethod] = useState('transfer')
     const [paidBS, setPaidBS] = useState('')
     const [paidPOS, setPaidPOS] = useState('')
     const [saving, setSaving] = useState(false)
     const [invoiceNum, setInvoiceNum] = useState(null)
     const [reference, setReference] = useState('')
+    const [mixedPayments, setMixedPayments] = useState([])
 
     useEffect(() => {
         nextInvoiceNumber().then(setInvoiceNum).catch(() => {})
     }, [])
 
+    // Resetear mixedPayments al cambiar de método
+    useEffect(() => {
+        if (method !== 'mixed') {
+            setMixedPayments([])
+        }
+    }, [method])
+
     const totalBs = useMemo(() => fromCents(totalCents), [totalCents])
 
     const mixedRemaining = useMemo(() => {
         if (method !== 'mixed') return null
-        const paidBsVal = parseFloat(paidBS) || 0
-        const paidPosVal = parseFloat(paidPOS) || 0
-        const totalPaid = paidBsVal + paidPosVal
+        const totalPaid = mixedPayments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
         const remaining = Math.max(0, totalBs - totalPaid)
         const covered = remaining < 0.005
-        return { remaining, covered }
-    }, [method, paidBS, paidPOS, totalBs])
+        return { remaining, covered, totalPaid }
+    }, [method, mixedPayments, totalBs])
 
     const change = useMemo(() => {
-        if (method === 'bs_cash' || method === 'usd_cash') {
+        if (method === 'bs_cash') {
+            if (!paidBS) return null
+            const paidBsCents = toCents(parseFloat(paidBS))
+            const ch = calcChange(paidBsCents, totalCents)
+            return ch > 0 ? { label: 'Vuelto', value: formatBs(ch) } : null
+        }
+        if (method === 'usd_cash') {
             const paidBsCents = toCents(parseFloat(paidBS) || 0)
             const ch = calcChange(paidBsCents, totalCents)
             return ch > 0 ? { label: 'Vuelto', value: formatBs(ch) } : null
@@ -61,7 +80,8 @@ export default function TicketPage() {
 
     const canPay = useCallback(() => {
         if (!session?.id) return false
-        if (method === 'bs_cash' || method === 'usd_cash') return parseFloat(paidBS) >= totalBs
+        if (method === 'bs_cash') return true
+        if (method === 'usd_cash') return parseFloat(paidBS) >= totalBs
         if (method === 'pos_term') return parseFloat(paidPOS) >= totalBs
         if (method === 'transfer') return true
         if (method === 'mixed') return !!mixedRemaining?.covered
@@ -79,11 +99,19 @@ export default function TicketPage() {
             const payment = {
                 method,
                 totalCents,
-                ...(method === 'bs_cash' && { paidBS: parseFloat(paidBS), changeBS: parseFloat(paidBS) - totalBs }),
+                ...(method === 'bs_cash' && {
+                    paidBS: parseFloat(paidBS) || totalBs,
+                    changeBS: paidBS ? parseFloat(paidBS) - totalBs : 0,
+                }),
                 ...(method === 'usd_cash' && { paidBS: parseFloat(paidBS), changeBS: parseFloat(paidBS) - totalBs }),
                 ...(method === 'pos_term' && { paidPOS: parseFloat(paidPOS) }),
                 ...(method === 'transfer' && { reference }),
-                ...(method === 'mixed' && { paidBS: parseFloat(paidBS) || 0, paidPOS: parseFloat(paidPOS) || 0 }),
+                ...(method === 'mixed' && {
+                    breakdown: mixedPayments.map(p => ({
+                        method: p.method,
+                        amountBS: parseFloat(p.amount) || 0,
+                    })),
+                }),
             }
             const orderId = await saveOrder({
                 cashierId: DEFAULT_USER.uid,
@@ -122,7 +150,7 @@ export default function TicketPage() {
                 <button
                     onClick={() => { setHoldOrderId(null); setScreen('pos') }}
                     aria-label="Volver al POS"
-                    className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-sm px-3 py-2 rounded-xl transition-all"
+                    className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 active:scale-95 text-white font-bold text-base px-5 py-3 rounded-xl transition-all"
                 >
                     ← Atrás
                 </button>
@@ -205,11 +233,12 @@ export default function TicketPage() {
                 {method === 'bs_cash' && (
                     <div>
                         <label htmlFor="paid-bs" className="label-xs">Monto recibido (Bs.)</label>
+                        <p className="text-slate-500 text-[11px] mb-2">Opcional — dejar vacío para pago exacto</p>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
                             <input
                                 id="paid-bs"
-                                type="number" step="0.01" min={totalBs}
+                                type="number" step="0.01"
                                 value={paidBS}
                                 onChange={e => setPaidBS(e.target.value)}
                                 className="input-field pl-10"
@@ -258,38 +287,63 @@ export default function TicketPage() {
                     </div>
                 )}
 
-                {/* Pago Mixto: Efectivo + POS */}
+                {/* Combinado: cualquier método */}
                 {method === 'mixed' && (
                     <div className="bg-[#1E293B] rounded-2xl p-4 space-y-3 border border-white/5">
-                        <div>
-                            <label htmlFor="paid-bs-mixed" className="label-xs">Recibido en Efectivo (Bs.)</label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
-                                <input
-                                    id="paid-bs-mixed"
-                                    type="number" step="0.01" min="0"
-                                    value={paidBS}
-                                    onChange={e => setPaidBS(e.target.value)}
-                                    className="input-field pl-10"
-                                    placeholder="0,00"
-                                />
+                        <p className="text-white font-bold text-sm">Métodos combinados</p>
+
+                        {/* Lista de métodos agregados */}
+                        {mixedPayments.length === 0 && (
+                            <p className="text-slate-500 text-xs text-center py-3">Agrega métodos de pago para combinar</p>
+                        )}
+                        {mixedPayments.map((mp, idx) => {
+                            const opt = MIXED_OPTIONS.find(o => o.id === mp.method)
+                            return (
+                                <div key={idx} className="flex items-center gap-2">
+                                    <span className="text-lg shrink-0">{opt?.icon || '💳'}</span>
+                                    <span className="text-xs text-slate-300 font-semibold w-24 shrink-0">{opt?.label || mp.method}</span>
+                                    <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs">Bs</span>
+                                        <input
+                                            type="number" step="0.01" min="0"
+                                            value={mp.amount}
+                                            onChange={e => {
+                                                const next = [...mixedPayments]
+                                                next[idx] = { ...next[idx], amount: e.target.value }
+                                                setMixedPayments(next)
+                                            }}
+                                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => setMixedPayments(mixedPayments.filter((_, i) => i !== idx))}
+                                        className="shrink-0 w-8 h-8 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-xs font-bold"
+                                        aria-label={`Quitar ${opt?.label}`}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            )
+                        })}
+
+                        {/* Botones para agregar métodos disponibles */}
+                        {MIXED_OPTIONS.length > mixedPayments.length && (
+                            <div className="flex flex-wrap gap-1.5">
+                                {MIXED_OPTIONS.filter(o => !mixedPayments.find(mp => mp.method === o.id)).map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setMixedPayments([...mixedPayments, { method: opt.id, amount: '' }])}
+                                        className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-blue-600/15 text-blue-400 hover:bg-blue-600/25 border border-blue-500/20 transition-colors"
+                                    >
+                                        + {opt.icon} {opt.label}
+                                    </button>
+                                ))}
                             </div>
-                        </div>
-                        <div>
-                            <label htmlFor="paid-pos-mixed" className="label-xs">Recibido por Punto de Venta (Bs.)</label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
-                                <input
-                                    id="paid-pos-mixed"
-                                    type="number" step="0.01" min="0"
-                                    value={paidPOS}
-                                    onChange={e => setPaidPOS(e.target.value)}
-                                    className="input-field pl-10"
-                                    placeholder="0,00"
-                                />
-                            </div>
-                        </div>
-                        {(paidBS || paidPOS) && mixedRemaining && (
+                        )}
+
+                        {/* Total cubierto / restante */}
+                        {mixedRemaining && mixedPayments.length > 0 && (
                             <div className={`rounded-xl px-4 py-3 flex justify-between items-center border ${
                                 mixedRemaining.covered
                                     ? 'bg-green-500/10 border-green-500/20'
@@ -298,11 +352,14 @@ export default function TicketPage() {
                                 <p className={`font-bold text-sm ${mixedRemaining.covered ? 'text-green-400' : 'text-amber-400'}`}>
                                     {mixedRemaining.covered ? '✅ Total cubierto' : 'Restante'}
                                 </p>
-                                {!mixedRemaining.covered && (
-                                    <div className="text-right">
+                                <div className="text-right">
+                                    {!mixedRemaining.covered && (
                                         <p className="text-amber-400 font-extrabold">Bs {mixedRemaining.remaining.toFixed(2)}</p>
-                                    </div>
-                                )}
+                                    )}
+                                    <p className="text-slate-500 text-[11px]">
+                                        Cubierto: Bs {mixedRemaining.totalPaid.toFixed(2)}
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -332,6 +389,17 @@ export default function TicketPage() {
                         />
                     </div>
                 )}
+            </div>
+
+            {/* Botón Regresar (abajo) */}
+            <div className="px-4 pb-4">
+                <button
+                    onClick={() => { setHoldOrderId(null); setScreen('pos') }}
+                    aria-label="Volver al POS"
+                    className="w-full bg-slate-700 hover:bg-slate-600 active:scale-[0.98] text-white font-bold py-4 px-6 rounded-2xl transition-all text-base"
+                >
+                    ← Regresar
+                </button>
             </div>
 
             {/* Botón Cobrar */}

@@ -2,11 +2,9 @@
 import { useState } from 'react'
 import { createProduct, updateProduct } from '../../services/productService'
 
-const CATEGORIES = ['Bebidas Sin Alcohol', 'Cervezas', 'Cocteles', 'Shots', 'Licores', 'Snacks', 'Otros']
+const EMOJIS = ['🥞', '🥩', '🥪', '🫓', '🧀', '🫔', '🥓', '🍽️', '🍗', '🥤', '🍟', '🍋', '🥨', '🌮', '🍕', '☕', '🧋']
 
-const EMOJIS = ['🍺', '🍻', '🍹', '🥃', '🍸', '🧃', '🥤', '🍷', '🫧', '🥨', '🍟', '🌮', '🍕', '☕', '🧋']
-
-const empty = { name: '', emoji: '🍺', category: 'Bebidas Sin Alcohol', priceBS: '', active: true }
+const empty = { name: '', emoji: '🍺', category: 'Otros', priceBS: '', active: true }
 
 export default function ProductForm({ product, onClose }) {
     const [form, setForm] = useState(product ? { ...product, priceBS: product.priceBS.toString() } : empty)
@@ -22,7 +20,7 @@ export default function ProductForm({ product, onClose }) {
         if (isNaN(price) || price <= 0) { setError('El precio debe ser mayor a 0'); return }
         setSaving(true)
         try {
-            const payload = { ...form, priceBS: price }
+            const payload = { ...form, priceBS: price, category: 'Otros' }
             if (editing) await updateProduct(product.id, payload)
             else await createProduct(payload)
             onClose()
@@ -69,18 +67,6 @@ export default function ProductForm({ product, onClose }) {
                             placeholder="ej. Polar Light 350ml"
                             required
                         />
-                    </div>
-
-                    {/* Categoría */}
-                    <div>
-                        <label className="label-xs">Categoría</label>
-                        <select
-                            value={form.category}
-                            onChange={e => set('category', e.target.value)}
-                            className="input-field"
-                        >
-                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
                     </div>
 
                     {/* Precio */}

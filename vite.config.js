@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Cochinitos POS',
+        name: 'Los 3 Cochinitos POS',
         short_name: 'Cochinitos',
-        description: 'Sistema POS - Cochinitos',
+        description: 'Sistema POS - Los 3 Cochinitos',
         theme_color: '#0F172A',
         background_color: '#0F172A',
         display: 'standalone',
@@ -25,4 +25,7 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 1000,
+  },
 })

@@ -1,4 +1,4 @@
-// src/firebase.js — Cochinitos POS
+// src/firebase.js — Los 3 Cochinitos POS
 // Proyecto: cochinitos-pos
 
 import { initializeApp } from 'firebase/app'

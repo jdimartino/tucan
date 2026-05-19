@@ -45,6 +45,16 @@ export default function SuccessPage() {
                                         <p className="text-slate-300 font-bold">Bs {lastOrderData.payment.paidBS.toFixed(2)}</p>
                                     </div>
                                 )}
+                                {lastOrderData.payment.breakdown && lastOrderData.payment.breakdown.map((b, i) => {
+                                    const labels = { bs_cash: 'Efectivo Bs.', transfer: 'Pago Móvil', pos_term: 'Punto de Venta', usd_cash: 'Efectivo USD' }
+                                    const icons = { bs_cash: '💴', transfer: '📲', pos_term: '💳', usd_cash: '💵' }
+                                    return (
+                                        <div key={i} className="flex justify-between">
+                                            <p className="text-slate-500 font-semibold">{icons[b.method] || ''} {labels[b.method] || b.method}</p>
+                                            <p className="text-slate-300 font-bold">Bs {b.amountBS.toFixed(2)}</p>
+                                        </div>
+                                    )
+                                })}
                             </>
                         )}
                     </div>

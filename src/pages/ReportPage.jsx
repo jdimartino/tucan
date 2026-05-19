@@ -2,19 +2,13 @@
 // Reporte del día al cierre de caja
 import { useSession } from '../context/SessionContext'
 import { useSalesReport } from '../hooks/useSalesReport'
-import { closeSession } from '../services/sessionService'
 import { formatBs } from '../utils/money'
 import { useState } from 'react'
-import { useToast } from '../components/Toast'
 import { getOrderItems } from '../services/orderService'
 
-export default function ReportPage({ onBack }) {
-    const { session, setSession } = useSession()
+export default function ReportPage() {
+    const { session } = useSession()
     const { orders, loading, totalTx } = useSalesReport(session?.id)
-    const toast = useToast()
-    const [closing, setClosing] = useState(false)
-    const [confirm, setConfirm] = useState(false)
-    const [closed, setClosed] = useState(false)
     const [expandedOrderId, setExpandedOrderId] = useState(null)
     const [orderItems, setOrderItems] = useState({})
     const [expandedMethod, setExpandedMethod] = useState(null)
@@ -38,27 +32,11 @@ export default function ReportPage({ onBack }) {
 
     const METHOD_LABELS = {
         bs_cash:    '💴 Efectivo Bs.',
-        transfer:   '📲 Transferencia',
+        transfer:   '📲 Pago Móvil',
         pos_term:   '💳 Punto de Venta',
         usd_cash:   '💵 Efectivo USD',
-        mixed:      '🔀 Efectivo + POS',
+        mixed:      '🔀 Combinado',
         unknown:    '❓ Sin método',
-    }
-
-    const handleClose = async () => {
-        setClosing(true)
-        try {
-            await closeSession(session.id, { totalBs: totalCentsSum / 100, totalTx })
-            setSession(null)
-            setClosed(true)
-            toast.success('Caja cerrada correctamente')
-        } catch (err) {
-            console.error(err)
-            toast.error('Error cerrando caja. Intenta de nuevo.')
-        } finally {
-            setClosing(false)
-            setConfirm(false)
-        }
     }
 
     const handleShareWhatsApp = () => {
@@ -76,7 +54,7 @@ export default function ReportPage({ onBack }) {
             })
             .join('\n')
         const msg = [
-            `🐷 *Cochinitos — Reporte del Día*`,
+            `🐷 *Los 3 Cochinitos — Reporte del Día*`,
             `📅 ${date}`,
             ``,
             `💵 *Total Ventas: ${formatBs(totalCentsSum)}*`,
@@ -89,21 +67,6 @@ export default function ReportPage({ onBack }) {
             orderLines,
         ].join('\n')
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
-    }
-
-    if (closed) {
-        return (
-            <div className="space-y-6">
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 text-center">
-                    <div className="text-4xl mb-3">🏁</div>
-                    <h3 className="text-white font-bold text-lg mb-1">Caja Cerrada</h3>
-                    <p className="text-slate-400 text-sm">El reporte del día fue guardado en Firestore.</p>
-                    <p className="text-blue-400 font-extrabold text-2xl mt-4">{formatBs(totalCentsSum)}</p>
-                    <p className="text-slate-400 text-xs mt-1">{totalTx} transacciones</p>
-                </div>
-                <button onClick={onBack} className="btn-secondary w-full">← Volver al Panel</button>
-            </div>
-        )
     }
 
     if (loading) return (
@@ -150,12 +113,25 @@ export default function ReportPage({ onBack }) {
                                     </div>
                                     {isExpanded && m === 'mixed' && (
                                         <div className="px-4 pb-3 space-y-1 border-t border-white/5 pt-2">
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-slate-400">💴 Efectivo recibido</span>
-                                                <span className="text-slate-300 font-bold">
-                                                    {formatBs(orders.filter(o => o.paymentMethod === 'mixed').reduce((s, o) => s + (o.paymentData?.paidBS || 0) * 100, 0))}
-                                                </span>
-                                            </div>
+                                            {(() => {
+                                                const breakdownTotals = {}
+                                                const labels = { bs_cash: '💴 Efectivo Bs.', transfer: '📲 Pago Móvil', pos_term: '💳 Punto de Venta', usd_cash: '💵 Efectivo USD' }
+                                                orders.filter(o => o.paymentMethod === 'mixed').forEach(o => {
+                                                    const bd = o.paymentData?.breakdown
+                                                    if (bd) {
+                                                        bd.forEach(b => { breakdownTotals[b.method] = (breakdownTotals[b.method] || 0) + b.amountBS })
+                                                    } else {
+                                                        const bs = o.paymentData?.paidBS || 0
+                                                        if (bs) breakdownTotals.bs_cash = (breakdownTotals.bs_cash || 0) + bs
+                                                    }
+                                                })
+                                                return Object.entries(breakdownTotals).map(([method, total]) => (
+                                                    <div key={method} className="flex justify-between text-xs">
+                                                        <span className="text-slate-400">{labels[method] || method}</span>
+                                                        <span className="text-slate-300 font-bold">Bs {total.toFixed(2)}</span>
+                                                    </div>
+                                                ))
+                                            })()}
                                         </div>
                                     )}
                                 </div>
@@ -237,28 +213,6 @@ export default function ReportPage({ onBack }) {
             >
                 📲 Compartir por WhatsApp
             </button>
-
-            {/* Botón cerrar caja */}
-            {!confirm ? (
-                <button onClick={() => setConfirm(true)} className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition-colors mt-2">
-                    🏁 Cerrar Caja
-                </button>
-            ) : (
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-5 space-y-3" role="dialog" aria-label="Confirmar cierre de caja">
-                    <p className="text-orange-400 font-bold text-center text-sm">¿Confirmar cierre de caja?</p>
-                    <p className="text-slate-400 text-xs text-center">Se registrará un total de <span className="text-white font-bold">{formatBs(totalCentsSum)}</span> en {totalTx} transacciones.</p>
-                    <div className="flex gap-2">
-                        <button onClick={() => setConfirm(false)} className="btn-secondary flex-1">Cancelar</button>
-                        <button
-                            onClick={handleClose}
-                            disabled={closing}
-                            className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-bold py-2.5 rounded-xl transition-colors disabled:opacity-50"
-                        >
-                            {closing ? 'Cerrando...' : 'Confirmar Cierre'}
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

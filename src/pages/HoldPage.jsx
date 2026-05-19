@@ -18,6 +18,7 @@ export default function HoldPage() {
 
     const [name, setName] = useState('')
     const [phone, setPhone] = useState('')
+    const [notes, setNotes] = useState('')
     const [saving, setSaving] = useState(false)
     const [retaking, setRetaking] = useState(null)
     const [assignMode, setAssignMode] = useState('new')
@@ -42,6 +43,7 @@ export default function HoldPage() {
                     sessionId: session.id,
                     items,
                     client: { name, phone },
+                    notes,
                 })
             } else {
                 await appendHoldOrder(selectedOrderId, items)
@@ -49,6 +51,7 @@ export default function HoldPage() {
             dispatch({ type: 'CLEAR_CART' })
             setName('')
             setPhone('')
+            setNotes('')
             setSelectedOrderId('')
             setAssignMode('new')
             toast.success('Cuenta guardada correctamente')
@@ -113,7 +116,7 @@ export default function HoldPage() {
         const lines = (items || [])
             .map(i => `${i.emoji} ${i.name} x${i.qty} — ${formatBs(i.subtotalCents)}`)
             .join('\n')
-        const msg = `🐷 *Cochinitos* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:\n\n${lines || '(sin detalle cargado)'}\n\n💵 *Total: ${totalBs}*\n\nGracias por tu visita 🙏`
+        const msg = `🐷 *Los 3 Cochinitos* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:\n\n${lines || '(sin detalle cargado)'}\n\n💵 *Total: ${totalBs}*\n\nGracias por tu visita 🙏`
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
@@ -207,6 +210,17 @@ export default function HoldPage() {
                                             onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                                             placeholder="ej. 04121234567"
                                             className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="hold-notes" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Notas</label>
+                                        <textarea
+                                            id="hold-notes"
+                                            value={notes}
+                                            onChange={e => setNotes(e.target.value)}
+                                            placeholder="Ej. sin cebolla, bien tostado..."
+                                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                                            rows={2}
                                         />
                                     </div>
                                 </>
@@ -305,6 +319,12 @@ export default function HoldPage() {
                                             </div>
                                         ))
                                     }
+                                    {order.notes && (
+                                        <div className="border-t border-white/5 pt-2 mt-2">
+                                            <p className="text-slate-500 text-[11px] uppercase tracking-wider font-bold mb-1">Notas</p>
+                                            <p className="text-slate-300 text-xs italic">{order.notes}</p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

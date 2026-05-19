@@ -7,11 +7,13 @@ import LogoIcon from '../components/LogoIcon'
 import ProductList from '../components/admin/ProductList'
 import SessionPanel from '../components/admin/SessionPanel'
 import ReportPage from './ReportPage'
+import HistoricalReportPage from './HistoricalReportPage'
 
 const TABS = [
     { id: 'products', label: '📦 Productos' },
     { id: 'caja', label: '🏪 Caja' },
-    { id: 'report', label: '📊 Reporte' },
+    { id: 'report', label: '📊 Reporte Hoy' },
+    { id: 'historical', label: '📋 Reporte Histórico' },
 ]
 
 export default function AdminPage() {
@@ -29,15 +31,15 @@ export default function AdminPage() {
                 <div className="flex items-center gap-2">
                     <LogoIcon className="w-7 h-7" />
                     <div>
-                        <p className="text-white font-bold text-sm leading-none">Cochinitos Admin</p>
-                        <p className="text-slate-500 text-[11px] leading-none mt-0.5">admin@cochinitos.app</p>
+                        <p className="text-white font-bold text-sm leading-none">Los 3 Cochinitos Admin</p>
+                        <p className="text-slate-400 text-[11px] leading-none mt-0.5 font-semibold">By JDM</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     {session?.status === 'open' && (
                         <button
                             onClick={() => setScreen('pos')}
-                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+                            className="text-sm font-bold px-4 py-2.5 rounded-xl bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
                         >
                             🏠 POS
                         </button>
@@ -66,8 +68,9 @@ export default function AdminPage() {
             {/* Content */}
             <main className="flex-1 p-4 overflow-auto">
                 {activeTab === 'products' && <ProductList />}
-                {activeTab === 'caja' && <SessionPanel onSessionOpen={() => setActiveTab('products')} />}
+                {activeTab === 'caja' && <SessionPanel onSessionOpen={() => setScreen('pos')} />}
                 {activeTab === 'report' && <ReportPage onBack={() => setActiveTab('caja')} />}
+                {activeTab === 'historical' && <HistoricalReportPage />}
             </main>
         </div>
     )

@@ -1,4 +1,4 @@
-// src/utils/money.js — Cochinitos POS
+// src/utils/money.js — Los 3 Cochinitos POS
 // Todas las operaciones en céntimos de bolívar (×100)
 
 export const toCents = (bs) => Math.round(bs * 100)

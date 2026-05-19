@@ -5,7 +5,7 @@ export default function LogoIcon({ className = "" }) {
             className={className}
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            aria-label="Cochinitos"
+            aria-label="Los 3 Cochinitos"
             role="img"
         >
             {/* Cuerpo alcancía */}

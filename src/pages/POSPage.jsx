@@ -1,5 +1,5 @@
 // src/pages/POSPage.jsx
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useSession } from '../context/SessionContext'
 import { useCart } from '../context/CartContext'
@@ -10,8 +10,6 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import LogoIcon from '../components/LogoIcon'
 import { formatBs } from '../utils/money'
 
-const ALL = 'Todos'
-
 export default function POSPage() {
     const { role } = useAuth()
     const { session } = useSession()
@@ -21,18 +19,9 @@ export default function POSPage() {
     const { orders: holdOrders } = useOpenOrders(session?.id)
     const isOnline = useOnlineStatus()
     const holdCount = holdOrders?.length || 0
-    const [activeCategory, setActiveCategory] = useState(ALL)
 
-    // Extraer categorías únicas de productos activos
-    const categories = useMemo(() => {
-        const cats = [...new Set(products.filter(p => p.active).map(p => p.category))]
-        return [ALL, ...cats]
-    }, [products])
-
-    const filtered = useMemo(() => products.filter(p =>
-        p.active &&
-        (activeCategory === ALL || p.category === activeCategory)
-    ), [products, activeCategory])
+    const activeProducts = products.filter(p => p.active)
+    const [cartCollapsed, setCartCollapsed] = useState(true)
 
     // Guardia: si no hay sesión activa, pedir abrir caja
     if (session?.status !== 'open' && !loading) {
@@ -59,14 +48,14 @@ export default function POSPage() {
             <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <div>
                     <p className="text-white font-bold text-sm leading-none flex items-center gap-1">
-                        <LogoIcon className="w-4 h-4 inline-block" /> Cochinitos POS
+                        <LogoIcon className="w-4 h-4 inline-block" /> Los 3 Cochinitos POS
                         {!isOnline && (
                             <span className="ml-2 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/20">
                                 Offline
                             </span>
                         )}
                     </p>
-                    <p className="text-slate-500 text-[11px] leading-none mt-0.5">admin@cochinitos.app</p>
+                    <p className="text-slate-400 text-xs leading-none mt-0.5 font-semibold">By JDM</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {holdCount > 0 && (
@@ -82,32 +71,13 @@ export default function POSPage() {
                         <button
                             onClick={() => setScreen?.('admin')}
                             aria-label="Panel de administración"
-                            className="text-sm text-slate-400 hover:text-blue-400 transition-colors font-semibold px-3 py-2 rounded-lg hover:bg-blue-500/10"
+                            className="text-sm text-slate-400 hover:text-blue-400 transition-colors font-semibold px-4 py-2.5 rounded-xl hover:bg-blue-500/10"
                         >
-                            ⚙️
+                            ⚙️ Administración
                         </button>
                     )}
                 </div>
             </header>
-
-            {/* ── Filtros de categoría ── */}
-            <nav className="px-4 pt-4 pb-2" aria-label="Filtros de categoría">
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                    {categories.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setActiveCategory(cat)}
-                            aria-pressed={activeCategory === cat}
-                            className={`whitespace-nowrap text-xs font-bold px-4 py-2 rounded-full transition-all flex-shrink-0 ${activeCategory === cat
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                                : 'bg-[#1E293B] text-slate-400 hover:text-white border border-white/5'
-                                }`}
-                        >
-                            {cat}
-                        </button>
-                    ))}
-                </div>
-            </nav>
 
             {/* ── Banner facturas en espera ── */}
             {itemCount === 0 && holdCount > 0 && (
@@ -128,18 +98,18 @@ export default function POSPage() {
                     <div className="flex items-center justify-center py-20">
                         <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     </div>
-                ) : filtered.length === 0 ? (
+                ) : activeProducts.length === 0 ? (
                     <div className="text-center py-16 text-slate-500">
                         <div className="text-5xl mb-3">📦</div>
                         <p className="font-semibold">Sin productos</p>
                         {products.length === 0
                             ? <p className="text-sm mt-1">El Admin debe cargar el menú primero</p>
-                            : <p className="text-sm mt-1">No hay ítems en esta categoría</p>
+                            : <p className="text-sm mt-1">No hay productos activos</p>
                         }
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                        {filtered.map(product => (
+                        {activeProducts.map(product => (
                             <ProductCard
                                 key={product.id}
                                 product={product}
@@ -157,33 +127,41 @@ export default function POSPage() {
                 <div className="fixed bottom-0 left-0 right-0 z-20 p-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
                     <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-3 shadow-2xl flex flex-col gap-2">
 
-                        {/* Info: ítems + emojis + total */}
-                        <div className="flex items-center justify-between px-1">
+                        {/* Info: ítems + emojis + total (clickeable) */}
+                        <div
+                            className="flex items-center justify-between px-1 cursor-pointer select-none"
+                            onClick={() => setCartCollapsed(c => !c)}
+                        >
                             <span className="text-white font-extrabold text-lg leading-none">{formatBs(totalCents)}</span>
-                            <span className="text-slate-400 text-xs">{itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}</span>
+                            <span className="text-slate-400 text-xs flex items-center gap-1">
+                                {itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}
+                                <span className="text-slate-600 text-[11px]">{cartCollapsed ? '▲' : '▼'}</span>
+                            </span>
                         </div>
 
-                        {/* Lista vertical de ítems */}
-                        <div className="w-full flex flex-col gap-1 max-h-28 overflow-y-auto">
-                            {items.map(item => (
-                                <div key={item.productId} className="flex items-center justify-between px-1 gap-2">
-                                    <span className="text-xs text-slate-300 flex items-center gap-1.5 flex-1 min-w-0">
-                                        <span>{item.emoji}</span>
-                                        <span className="truncate">{item.qty}× {item.name}</span>
-                                    </span>
-                                    <span className="text-xs font-bold text-blue-400 shrink-0">
-                                        {formatBs(item.subtotalCents)}
-                                    </span>
-                                    <button
-                                        onPointerDown={e => { e.stopPropagation(); dispatch({ type: 'DECREMENT_ITEM', payload: item.productId }) }}
-                                        className="shrink-0 w-10 h-10 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all text-lg font-bold leading-none flex items-center justify-center"
-                                        aria-label={`Quitar ${item.name}`}
-                                    >
-                                        −
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                        {/* Lista vertical de ítems (colapsable) */}
+                        {!cartCollapsed && (
+                            <div className="w-full flex flex-col gap-1 max-h-40 overflow-y-auto">
+                                {items.map(item => (
+                                    <div key={item.productId} className="flex items-center justify-between px-1 gap-2">
+                                        <span className="text-xs text-slate-300 flex items-center gap-1.5 flex-1 min-w-0">
+                                            <span>{item.emoji}</span>
+                                            <span className="truncate">{item.qty}× {item.name}</span>
+                                        </span>
+                                        <span className="text-xs font-bold text-blue-400 shrink-0">
+                                            {formatBs(item.subtotalCents)}
+                                        </span>
+                                        <button
+                                            onPointerDown={e => { e.stopPropagation(); dispatch({ type: 'DECREMENT_ITEM', payload: item.productId }) }}
+                                            className="shrink-0 w-10 h-10 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all text-lg font-bold leading-none flex items-center justify-center"
+                                            aria-label={`Quitar ${item.name}`}
+                                        >
+                                            −
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Botones de acción */}
                         <div className="flex gap-2 mt-1">
