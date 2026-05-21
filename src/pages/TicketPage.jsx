@@ -125,6 +125,7 @@ export default function TicketPage() {
                 items: [...items],
                 totalCents,
                 payment: { ...payment },
+                invoiceNumber: invoiceNum,
             })
             dispatch({ type: 'CLEAR_CART' })
             if (holdOrderId) {

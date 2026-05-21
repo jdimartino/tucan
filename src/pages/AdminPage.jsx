@@ -8,6 +8,8 @@ import ProductList from '../components/admin/ProductList'
 import SessionPanel from '../components/admin/SessionPanel'
 import ReportPage from './ReportPage'
 import HistoricalReportPage from './HistoricalReportPage'
+import { resetAllOrders } from '../services/orderService'
+import { useToast } from '../components/Toast'
 
 const TABS = [
     { id: 'products', label: '📦 Productos' },
@@ -21,6 +23,23 @@ export default function AdminPage() {
     const { role } = useAuth()
     const { session } = useSession()
     const { setScreen } = useNav()
+    const toast = useToast()
+    const [resetting, setResetting] = useState(false)
+
+    const handleResetOrders = async () => {
+        if (!window.confirm('⚠️ ¿Estás seguro? Se borrarán TODAS las facturas y el contador se reiniciará a #0001. Los productos, precios, métodos de pago y configuraciones se conservan.\n\nEsta acción NO se puede deshacer.')) return
+        if (!window.confirm('Confirmación final: ¿Estás ABSOLUTAMENTE seguro? Las órdenes eliminadas NO se pueden recuperar.')) return
+        setResetting(true)
+        try {
+            const count = await resetAllOrders()
+            toast.success(`✅ Reset completo. Se eliminaron ${count} órdenes y el contador se reinició a #0001.`)
+        } catch (err) {
+            console.error(err)
+            toast.error('Error al resetear. Revisa la consola.')
+        } finally {
+            setResetting(false)
+        }
+    }
 
     if (role !== 'admin') return null
 
@@ -72,6 +91,20 @@ export default function AdminPage() {
                 {activeTab === 'report' && <ReportPage onBack={() => setActiveTab('caja')} />}
                 {activeTab === 'historical' && <HistoricalReportPage />}
             </main>
+
+            {/* ⚠️ TEMPORAL — Botón de reseteo de facturas */}
+            <div className="px-4 pb-4">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3">
+                    <p className="text-red-400 text-[11px] font-bold uppercase tracking-wider mb-2 text-center">⚠️ Zona de Reseteo (temporal)</p>
+                    <button
+                        onClick={handleResetOrders}
+                        disabled={resetting}
+                        className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-extrabold py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none shadow-lg shadow-red-600/20"
+                    >
+                        {resetting ? 'Eliminando órdenes...' : '🔄 Resetear Facturas (una sola vez)'}
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }

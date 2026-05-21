@@ -5,14 +5,14 @@ import { useSession } from '../context/SessionContext'
 import { DEFAULT_USER } from '../context/AuthContext'
 import { useNav } from '../context/NavigationContext'
 import { useOpenOrders } from '../hooks/useOpenOrders'
-import { saveHoldOrder, reopenOrder, cancelHoldOrder, appendHoldOrder, getOrderItems } from '../services/orderService'
+import { saveHoldOrder, reopenOrder, cancelHoldOrder, appendHoldOrder, getOrderItems, updateHoldOrder } from '../services/orderService'
 import { formatBs } from '../utils/money'
 import { useToast } from '../components/Toast'
 
 export default function HoldPage() {
     const { items, totalCents, dispatch } = useCart()
     const { session } = useSession()
-    const { setScreen, setHoldOrderId } = useNav()
+    const { setScreen, setHoldOrderId, holdOrderId } = useNav()
     const { orders, loading } = useOpenOrders(session?.id)
     const toast = useToast()
 
@@ -101,6 +101,52 @@ export default function HoldPage() {
         }
     }
 
+    const handleEdit = async (orderId) => {
+        try {
+            const holdItems = await reopenOrder(orderId)
+            dispatch({ type: 'CLEAR_CART' })
+            holdItems.forEach(item => {
+                for (let i = 0; i < item.qty; i++) {
+                    dispatch({
+                        type: 'ADD_ITEM',
+                        payload: {
+                            id: item.productId,
+                            name: item.name,
+                            emoji: item.emoji,
+                            priceBS: item.unitPriceCents / 100,
+                        },
+                    })
+                }
+            })
+            setHoldOrderId(orderId)
+            setScreen('pos')
+            toast.success('Editando cuenta. Modifica los productos y luego guarda.')
+        } catch {
+            toast.error('Error al cargar la cuenta.')
+        }
+    }
+
+    const handleSaveEdit = async () => {
+        if (!hasItems || !holdOrderId) return
+        setSaving(true)
+        try {
+            await updateHoldOrder(holdOrderId, items)
+            dispatch({ type: 'CLEAR_CART' })
+            setHoldOrderId(null)
+            toast.success('Cuenta actualizada correctamente')
+        } catch (err) {
+            console.error(err)
+            toast.error('Error al guardar los cambios.')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleCancelEdit = () => {
+        dispatch({ type: 'CLEAR_CART' })
+        setHoldOrderId(null)
+    }
+
     const handleExpand = async (orderId) => {
         if (expandedOrderId === orderId) { setExpandedOrderId(null); return }
         setExpandedOrderId(orderId)
@@ -116,7 +162,8 @@ export default function HoldPage() {
         const lines = (items || [])
             .map(i => `${i.emoji} ${i.name} x${i.qty} — ${formatBs(i.subtotalCents)}`)
             .join('\n')
-        const msg = `🐷 *Los 3 Cochinitos* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:\n\n${lines || '(sin detalle cargado)'}\n\n💵 *Total: ${totalBs}*\n\nGracias por tu visita 🙏`
+        const detailSection = items?.length ? `\n\n${lines}` : ''
+        const msg = `🐷 *Los 3 Cochinitos* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:${detailSection}\n\n💵 *Total: ${totalBs}*\n\n*Datos del Pago Movil*\n📱 04122098241\nV-22034344\n🏦 0134 (Banesco)\n\nGracias por tu visita 🙏`
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
@@ -146,111 +193,143 @@ export default function HoldPage() {
 
             <div className="flex-1 px-4 pt-4 space-y-5">
 
-                {/* ── SECCIÓN A: Guardar el carrito actual ── */}
+                {/* ── SECCIÓN A: Guardar / Editar carrito actual ── */}
                 {hasItems && (
                     <div className="bg-[#1E293B] rounded-2xl p-4 border border-white/5">
-                        <h2 className="text-white font-bold text-sm mb-3">
-                            💾 Guardar cuenta actual
-                            <span className="text-slate-500 font-normal ml-2 text-xs">
-                                {items.length} producto{items.length !== 1 ? 's' : ''} · {formatBs(totalCents)}
-                            </span>
-                        </h2>
-
-                        {/* Mini resumen del carrito */}
-                        <div className="flex flex-wrap gap-1.5 mb-4">
-                            {items.map(item => (
-                                <span key={item.productId} className="text-[11px] bg-white/5 border border-white/10 text-slate-300 px-2 py-1 rounded-full flex items-center gap-1">
-                                    {item.emoji} {item.qty}x {item.name}
-                                </span>
-                            ))}
-                        </div>
-
-                        {/* Opciones de asignación */}
-                        {orders.length > 0 && (
-                            <div className="flex gap-2 mb-4 bg-[#0F172A] p-1 rounded-xl border border-white/5" role="tablist">
-                                <button
-                                    role="tab"
-                                    aria-selected={assignMode === 'new'}
-                                    onClick={() => setAssignMode('new')}
-                                    className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'new' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    Nuevo Cliente
-                                </button>
-                                <button
-                                    role="tab"
-                                    aria-selected={assignMode === 'existing'}
-                                    onClick={() => setAssignMode('existing')}
-                                    className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'existing' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    Anexar a Existente
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="space-y-3">
-                            {assignMode === 'new' || orders.length === 0 ? (
-                                <>
-                                    <div>
-                                        <label htmlFor="client-name" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Nombre del Cliente</label>
-                                        <input
-                                            id="client-name"
-                                            type="text"
-                                            value={name}
-                                            onChange={e => setName(e.target.value)}
-                                            placeholder="ej. Jonathan"
-                                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="client-phone" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Celular</label>
-                                        <input
-                                            id="client-phone"
-                                            type="tel"
-                                            value={phone}
-                                            onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                                            placeholder="ej. 04121234567"
-                                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="hold-notes" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Notas</label>
-                                        <textarea
-                                            id="hold-notes"
-                                            value={notes}
-                                            onChange={e => setNotes(e.target.value)}
-                                            placeholder="Ej. sin cebolla, bien tostado..."
-                                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
-                                            rows={2}
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <div>
-                                    <label htmlFor="select-order" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Seleccionar Cuenta Abierta</label>
-                                    <select
-                                        id="select-order"
-                                        value={selectedOrderId}
-                                        onChange={e => setSelectedOrderId(e.target.value)}
-                                        className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                    >
-                                        <option value="" disabled>-- Elige un cliente --</option>
-                                        {orders.map(o => (
-                                            <option key={o.id} value={o.id}>
-                                                {o.client?.name} (Lleva: {formatBs(o.totalCents)})
-                                            </option>
-                                        ))}
-                                    </select>
+                        {holdOrderId ? (
+                            <>
+                                <h2 className="text-white font-bold text-sm mb-3">
+                                    ✏️ Editando cuenta
+                                </h2>
+                                <div className="flex flex-wrap gap-1.5 mb-4">
+                                    {items.map(item => (
+                                        <span key={item.productId} className="text-[11px] bg-white/5 border border-white/10 text-slate-300 px-2 py-1 rounded-full flex items-center gap-1">
+                                            {item.emoji} {item.qty}x {item.name}
+                                        </span>
+                                    ))}
                                 </div>
-                            )}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleCancelEdit}
+                                        className="flex-1 bg-slate-600 hover:bg-slate-500 active:scale-[0.98] text-white font-bold py-3 rounded-xl text-sm transition-all"
+                                    >
+                                        ❌ Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleSaveEdit}
+                                        disabled={saving}
+                                        className="flex-[2] bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-extrabold py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none shadow-lg shadow-blue-600/20"
+                                    >
+                                        {saving ? 'Guardando...' : '💾 Guardar Cambios'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="text-white font-bold text-sm mb-3">
+                                    💾 Guardar cuenta actual
+                                    <span className="text-slate-500 font-normal ml-2 text-xs">
+                                        {items.length} producto{items.length !== 1 ? 's' : ''} · {formatBs(totalCents)}
+                                    </span>
+                                </h2>
 
-                            <button
-                                onClick={handleSave}
-                                disabled={!canSave || saving}
-                                className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-black font-extrabold py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none shadow-lg shadow-amber-500/20"
-                            >
-                                {saving ? 'Guardando...' : assignMode === 'existing' && orders.length > 0 ? '⏳ Anexar Pedido' : '⏳ Dejar en Espera'}
-                            </button>
-                        </div>
+                                {/* Mini resumen del carrito */}
+                                <div className="flex flex-wrap gap-1.5 mb-4">
+                                    {items.map(item => (
+                                        <span key={item.productId} className="text-[11px] bg-white/5 border border-white/10 text-slate-300 px-2 py-1 rounded-full flex items-center gap-1">
+                                            {item.emoji} {item.qty}x {item.name}
+                                        </span>
+                                    ))}
+                                </div>
+
+                                {/* Opciones de asignación */}
+                                {orders.length > 0 && (
+                                    <div className="flex gap-2 mb-4 bg-[#0F172A] p-1 rounded-xl border border-white/5" role="tablist">
+                                        <button
+                                            role="tab"
+                                            aria-selected={assignMode === 'new'}
+                                            onClick={() => setAssignMode('new')}
+                                            className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'new' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                                        >
+                                            Nuevo Cliente
+                                        </button>
+                                        <button
+                                            role="tab"
+                                            aria-selected={assignMode === 'existing'}
+                                            onClick={() => setAssignMode('existing')}
+                                            className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${assignMode === 'existing' ? 'bg-amber-500 text-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                                        >
+                                            Anexar a Existente
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div className="space-y-3">
+                                    {assignMode === 'new' || orders.length === 0 ? (
+                                        <>
+                                            <div>
+                                                <label htmlFor="client-name" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Nombre del Cliente</label>
+                                                <input
+                                                    id="client-name"
+                                                    type="text"
+                                                    value={name}
+                                                    onChange={e => setName(e.target.value)}
+                                                    placeholder="ej. Jonathan"
+                                                    className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label htmlFor="client-phone" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Celular</label>
+                                                <input
+                                                    id="client-phone"
+                                                    type="tel"
+                                                    value={phone}
+                                                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                                                    placeholder="ej. 04121234567"
+                                                    className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label htmlFor="hold-notes" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Notas</label>
+                                                <textarea
+                                                    id="hold-notes"
+                                                    value={notes}
+                                                    onChange={e => setNotes(e.target.value)}
+                                                    placeholder="Ej. sin cebolla, bien tostado..."
+                                                    className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div>
+                                            <label htmlFor="select-order" className="block text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Seleccionar Cuenta Abierta</label>
+                                            <select
+                                                id="select-order"
+                                                value={selectedOrderId}
+                                                onChange={e => setSelectedOrderId(e.target.value)}
+                                                className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                            >
+                                                <option value="" disabled>-- Elige un cliente --</option>
+                                                {orders.map(o => (
+                                                    <option key={o.id} value={o.id}>
+                                                        {o.client?.name} (Lleva: {formatBs(o.totalCents)})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={!canSave || saving}
+                                        className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-black font-extrabold py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none shadow-lg shadow-amber-500/20"
+                                    >
+                                        {saving ? 'Guardando...' : assignMode === 'existing' && orders.length > 0 ? '⏳ Anexar Pedido' : '⏳ Dejar en Espera'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -335,6 +414,12 @@ export default function HoldPage() {
                                     className="flex-1 bg-green-500/15 hover:bg-green-500/25 border border-green-500/25 text-green-400 font-bold py-2.5 rounded-xl text-xs transition-all"
                                 >
                                     📲 Notificar
+                                </button>
+                                <button
+                                    onClick={() => handleEdit(order.id)}
+                                    className="bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 text-blue-400 font-bold px-3 py-2.5 rounded-xl text-sm transition-all"
+                                >
+                                    ✏️
                                 </button>
                                 <button
                                     onClick={() => handleCancel(order.id)}

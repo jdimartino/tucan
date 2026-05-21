@@ -1,6 +1,6 @@
 // src/services/orderService.js
 import {
-    collection, doc, updateDoc,
+    collection, doc, updateDoc, deleteDoc, setDoc,
     serverTimestamp, query, where, getDocs,
     writeBatch, runTransaction,
 } from 'firebase/firestore'
@@ -147,6 +147,51 @@ export async function cancelHoldOrder(orderId) {
 }
 
 /**
+ * Anula una factura ya cobrada (la marca como voided sin cambiar su status,
+ * para que siga apareciendo en reportes pero sin contar en los totales).
+ */
+export async function voidOrder(orderId) {
+    return updateDoc(doc(db, 'orders', orderId), {
+        voided: true,
+        voidedAt: serverTimestamp(),
+    })
+}
+
+/**
+ * Reemplaza todos los ítems de una cuenta en espera (actualización completa).
+ */
+export async function updateHoldOrder(orderId, items) {
+    const batch = writeBatch(db)
+    const orderRef = doc(db, 'orders', orderId)
+    const totalCents = items.reduce((s, i) => s + i.subtotalCents, 0)
+
+    batch.update(orderRef, { totalCents, updatedAt: serverTimestamp() })
+
+    const existingSnap = await getDocs(collection(db, 'orders', orderId, 'items'))
+    const existingIds = new Set(existingSnap.docs.map(d => d.id))
+    const newIds = new Set(items.map(i => i.productId))
+
+    for (const id of existingIds) {
+        if (!newIds.has(id)) {
+            batch.delete(doc(db, 'orders', orderId, 'items', id))
+        }
+    }
+
+    for (const item of items) {
+        const itemRef = doc(db, 'orders', orderId, 'items', item.productId)
+        batch.set(itemRef, {
+            name: item.name,
+            emoji: item.emoji,
+            qty: item.qty,
+            unitPriceCents: item.unitPriceCents,
+            subtotalCents: item.subtotalCents,
+        })
+    }
+
+    await batch.commit()
+}
+
+/**
  * Anexa ítems a una cuenta en espera existente usando runTransaction (atómica).
  */
 export async function appendHoldOrder(orderId, items) {
@@ -196,4 +241,49 @@ export async function appendHoldOrder(orderId, items) {
             }
         }
     })
+}
+
+/**
+ * Elimina TODAS las órdenes y resetea el contador de facturas.
+ * Conserva productos, sesiones y demás configuraciones.
+ */
+export async function resetAllOrders() {
+    const snap = await getDocs(collection(db, 'orders'))
+    const orderIds = snap.docs.map(d => d.id)
+
+    let batch = writeBatch(db)
+    let opCount = 0
+
+    const flushBatch = async () => {
+        if (opCount > 0) {
+            await batch.commit()
+            batch = writeBatch(db)
+            opCount = 0
+        }
+    }
+
+    for (const orderId of orderIds) {
+        const itemsSnap = await getDocs(collection(db, 'orders', orderId, 'items'))
+        itemsSnap.docs.forEach(d => {
+            batch.delete(d.ref)
+            opCount++
+            if (opCount >= 400) flushBatch()
+        })
+
+        const paySnap = await getDocs(collection(db, 'orders', orderId, 'payments'))
+        paySnap.docs.forEach(d => {
+            batch.delete(d.ref)
+            opCount++
+            if (opCount >= 400) flushBatch()
+        })
+
+        batch.delete(doc(db, 'orders', orderId))
+        opCount++
+        if (opCount >= 400) flushBatch()
+    }
+
+    await flushBatch()
+    await setDoc(doc(db, 'counters', 'invoices'), { current: 0 }, { merge: true })
+
+    return orderIds.length
 }
