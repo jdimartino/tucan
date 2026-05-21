@@ -156,14 +156,18 @@ export default function HoldPage() {
         }
     }
 
-    const handleNotify = (order, items) => {
+    const handleNotify = async (order) => {
         const phone = order.client?.phone?.replace(/^0/, '58')
         const totalBs = formatBs(order.totalCents)
-        const lines = (items || [])
+        let items = orderItems[order.id]
+        if (!items?.length) {
+            items = await getOrderItems(order.id)
+            setOrderItems(prev => ({ ...prev, [order.id]: items }))
+        }
+        const lines = items
             .map(i => `${i.emoji} ${i.name} x${i.qty} — ${formatBs(i.subtotalCents)}`)
             .join('\n')
-        const detailSection = items?.length ? `\n\n${lines}` : ''
-        const msg = `🐷 *Los 3 Cochinitos* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:${detailSection}\n\n💵 *Total: ${totalBs}*\n\n*Datos del Pago Movil*\n📱 04122098241\nV-22034344\n🏦 0134 (Banesco)\n\nGracias por tu visita 🙏`
+        const msg = `🐷 *Los 3 Cochinitos* — Detalle de tu cuenta\n\nHola *${order.client?.name}*, aquí el resumen:\n\n${lines}\n\n💵 *Total: ${totalBs}*\n\n*Datos del Pago Movil*\n📱 04122098241\nV-22034344\n🏦 0134 (Banesco)\n\nGracias por tu visita 🙏`
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
@@ -410,7 +414,7 @@ export default function HoldPage() {
                             {/* Botones */}
                             <div className="flex gap-2 mt-3">
                                 <button
-                                    onClick={() => handleNotify(order, orderItems[order.id])}
+                                    onClick={() => handleNotify(order)}
                                     className="flex-1 bg-green-500/15 hover:bg-green-500/25 border border-green-500/25 text-green-400 font-bold py-2.5 rounded-xl text-xs transition-all"
                                 >
                                     📲 Notificar
