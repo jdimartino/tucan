@@ -242,7 +242,7 @@ function ProductCard({ product, qty, rate, onAdd, onRemove }) {
 
             <div className="text-3xl text-center mt-1 mb-2">{product.emoji}</div>
             <p className="text-white text-xs font-semibold text-center leading-tight mb-0.5 line-clamp-2">{product.name}</p>
-            <p className="text-blue-400 text-sm font-extrabold text-center">${product.priceUSD.toFixed(2)}</p>
+            <p className="text-blue-400 text-sm font-extrabold text-center mb-2">${product.priceUSD.toFixed(2)}</p>
             {bsPrice && <p className="text-amber-400 font-bold text-[10px] text-center mb-2">{bsPrice}</p>}
 
             <div className="mt-auto pt-2 flex gap-1">

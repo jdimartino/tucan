@@ -99,6 +99,7 @@ export default function TicketPage() {
             setLastOrderData({
                 items: [...items],
                 totalCents,
+                invoiceNumber: invoiceNum,
                 payment: { ...payment },
                 exchangeRateBs: rate
             })

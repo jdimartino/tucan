@@ -51,14 +51,38 @@ export default function SuccessPage() {
                             <>
                                 {lastOrderData.payment.paidUSD > 0 && (
                                     <div className="flex justify-between">
-                                        <p className="text-slate-500 font-semibold">Pagado USD</p>
+                                        <p className="text-slate-500 font-semibold flex items-center gap-1">
+                                            <span>💵</span> Efectivo USD
+                                        </p>
                                         <p className="text-slate-300 font-bold">${lastOrderData.payment.paidUSD.toFixed(2)}</p>
                                     </div>
                                 )}
                                 {lastOrderData.payment.paidBS > 0 && (
                                     <div className="flex justify-between">
-                                        <p className="text-slate-500 font-semibold">Pagado BS</p>
+                                        <p className="text-slate-500 font-semibold flex items-center gap-1">
+                                            <span>💴</span> Efectivo BS
+                                        </p>
                                         <p className="text-slate-300 font-bold">Bs {lastOrderData.payment.paidBS.toFixed(2)}</p>
+                                    </div>
+                                )}
+                                {lastOrderData.payment.method === 'pago_movil' && lastOrderData.payment.reference && (
+                                    <div className="flex justify-between">
+                                        <p className="text-slate-500 font-semibold flex items-center gap-1">
+                                            <span>📲</span> Pago Móvil
+                                        </p>
+                                        <p className="text-slate-300 font-bold">#{lastOrderData.payment.reference}</p>
+                                    </div>
+                                )}
+                                {lastOrderData.payment.changeUSD > 0 && (
+                                    <div className="flex justify-between bg-green-500/10 rounded-lg px-2 py-1.5 -mx-2">
+                                        <p className="text-green-400 font-bold">Vuelto</p>
+                                        <p className="text-green-400 font-extrabold">${lastOrderData.payment.changeUSD.toFixed(2)}</p>
+                                    </div>
+                                )}
+                                {lastOrderData.payment.changeBS > 0 && (
+                                    <div className="flex justify-between bg-green-500/10 rounded-lg px-2 py-1.5 -mx-2">
+                                        <p className="text-green-400 font-bold">Vuelto</p>
+                                        <p className="text-green-400 font-extrabold">Bs {lastOrderData.payment.changeBS.toFixed(2)}</p>
                                     </div>
                                 )}
                             </>
