@@ -2,7 +2,7 @@
 // Proyecto: tucanapp-pos · Configuración real
 
 import { initializeApp } from 'firebase/app'
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
+import { initializeFirestore, CACHE_SIZE_UNLIMITED, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -18,20 +18,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 
-export const db = getFirestore(app)
-export const auth = getAuth(app)
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+    }),
+})
 
-// Persistencia offline con delay para evitar race condition con listeners
-setTimeout(() => {
-    enableIndexedDbPersistence(db).then(() => {
-        console.log('Firestore offline: persistencia habilitada')
-    }).catch((err) => {
-        if (err.code === 'failed-precondition') {
-            console.warn('Firestore offline: múltiples pestañas abiertas')
-        } else if (err.code === 'unimplemented') {
-            console.warn('Firestore offline: navegador no soportado')
-        } else {
-            console.warn('Firestore offline: error', err.code)
-        }
-    })
-}, 1000)
+export const auth = getAuth(app)
