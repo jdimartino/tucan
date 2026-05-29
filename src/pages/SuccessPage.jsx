@@ -26,8 +26,10 @@ export default function SuccessPage() {
             {/* Detalles de la orden */}
             <div className="bg-[#1E293B] rounded-2xl w-full max-w-sm p-5 text-left space-y-4 mb-8 border border-white/5">
                 <div className="flex justify-between items-center text-xs">
-                    <p className="text-slate-400 font-bold uppercase tracking-wider">Número de Orden</p>
-                    <p className="text-white font-mono truncate ml-2 max-w-[140px]">{lastOrderId?.slice(0, 8) || '—'}</p>
+                    <p className="text-slate-400 font-bold uppercase tracking-wider">N° de Factura</p>
+                    <p className="text-white font-extrabold text-sm">
+                        {lastOrderData?.invoiceNumber != null ? `#${String(lastOrderData.invoiceNumber).padStart(4, '0')}` : '—'}
+                    </p>
                 </div>
                 {session?.exchangeRateBs && (
                     <div className="flex justify-between items-center text-xs">

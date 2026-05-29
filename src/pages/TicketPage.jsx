@@ -2,7 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useCart } from '../context/CartContext'
 import { useSession } from '../context/SessionContext'
-import { useAuth } from '../context/AuthContext'
+import { DEFAULT_ADMIN_UID } from '../context/AuthContext'
 import { useNav } from '../context/NavigationContext'
 import { saveOrder, nextInvoiceNumber, completeHoldOrder } from '../services/orderService'
 import { formatUSD, formatBsNum, toCents, fromCents, calcChange } from '../utils/money'
@@ -18,7 +18,6 @@ const METHODS = [
 export default function TicketPage() {
     const { items, totalCents, dispatch } = useCart()
     const { session } = useSession()
-    const { user } = useAuth()
     const { setScreen, setOrderId, setLastOrderData, holdOrderId, setHoldOrderId } = useNav()
     const toast = useToast()
     const rate = session?.exchangeRateBs || 1
@@ -48,18 +47,17 @@ export default function TicketPage() {
         return { remainingUSD, remainingBS, covered }
     }, [method, paid, paidBS, totalUSD, rate])
 
-    // Calcular vuelto según método
     const change = useMemo(() => {
         if (method === 'usd_cash') {
             const paidCents = toCents(parseFloat(paid) || 0)
             const ch = calcChange(paidCents, totalCents)
-            return ch > 0 ? { label: 'Vuelto USD', value: formatUSD(ch) } : null
+            return ch > 0 ? { label: 'Vuelto', value: formatUSD(ch) } : null
         }
         if (method === 'bs_cash') {
             const paidBsCents = toCents(parseFloat(paidBS) || 0)
             const totalBsCents = toCents(parseFloat(totalBS))
             const ch = calcChange(paidBsCents, totalBsCents)
-            return ch > 0 ? { label: 'Vuelto BS', value: `Bs ${fromCents(ch).toFixed(2)}` } : null
+            return ch > 0 ? { label: 'Vuelto', value: `Bs ${fromCents(ch).toFixed(2)}` } : null
         }
         return null
     }, [method, paid, paidBS, totalCents, totalBS])
@@ -90,7 +88,7 @@ export default function TicketPage() {
                 ...(method === 'mixed' && { paidUSD: parseFloat(paid) || 0, paidBS: parseFloat(paidBS) || 0 }),
             }
             const orderId = await saveOrder({
-                cashierId: user.uid,
+                cashierId: DEFAULT_ADMIN_UID,
                 sessionId: session.id,
                 exchangeRateBs: rate,
                 items,
@@ -118,7 +116,6 @@ export default function TicketPage() {
         }
     }
 
-    // Banner de sesión no activa
     const noSession = !session?.id
 
     return (
@@ -129,7 +126,7 @@ export default function TicketPage() {
                 <button
                     onClick={() => { setHoldOrderId(null); setScreen('pos') }}
                     aria-label="Volver al POS"
-                    className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-sm px-3 py-2 rounded-xl transition-all"
+                    className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 active:scale-95 text-white font-bold text-base px-5 py-3 rounded-xl transition-all"
                 >
                     ← Atrás
                 </button>
@@ -137,15 +134,15 @@ export default function TicketPage() {
                     <div className="flex items-center gap-2">
                         <p className="text-white font-bold text-sm leading-none">Ticket de Cobro</p>
                         {invoiceNum != null
-                            ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                            ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
                                 #{String(invoiceNum).padStart(4, '0')}
                               </span>
-                            : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-500 border border-white/10 animate-pulse">
+                            : <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-500 border border-white/10 animate-pulse">
                                 #----
                               </span>
                         }
                     </div>
-                    <p className="text-slate-500 text-[10px] mt-0.5">{items.length} producto{items.length !== 1 ? 's' : ''}</p>
+                    <p className="text-slate-500 text-[11px] mt-0.5">{items.length} producto{items.length !== 1 ? 's' : ''}</p>
                 </div>
                 <div className="ml-auto text-right">
                     <p className="text-blue-400 font-extrabold text-lg leading-none">{formatUSD(totalCents)}</p>
@@ -173,11 +170,11 @@ export default function TicketPage() {
                             <span className="text-base">{item.emoji}</span>
                             <div className="flex-1">
                                 <p className="text-white text-xs font-semibold">{item.name}</p>
-                                <p className="text-slate-500 text-[10px]">{item.qty} × {formatUSD(item.unitPriceCents)}</p>
+                                <p className="text-slate-500 text-[11px]">{item.qty} × {formatUSD(item.unitPriceCents)}</p>
                             </div>
                             <div className="text-right">
                                 <p className="text-blue-400 font-bold text-xs">{formatUSD(item.subtotalCents)}</p>
-                                <p className="text-amber-400 font-bold text-[10px]">Bs {formatBsNum(fromCents(item.subtotalCents) * rate)}</p>
+                                <p className="text-amber-400 font-bold text-[11px]">Bs {formatBsNum(fromCents(item.subtotalCents) * rate)}</p>
                             </div>
                         </div>
                     ))}
@@ -231,11 +228,12 @@ export default function TicketPage() {
                 {method === 'bs_cash' && (
                     <div>
                         <label htmlFor="paid-bs" className="label-xs">Monto recibido (BS)</label>
+                        <p className="text-slate-500 text-[11px] mb-2">Opcional — dejar vacío para pago exacto</p>
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
                             <input
                                 id="paid-bs"
-                                type="number" step="0.01" min={parseFloat(totalBS)}
+                                type="number" step="0.01"
                                 value={paidBS}
                                 onChange={e => setPaidBS(e.target.value)}
                                 className="input-field pl-10"
@@ -320,8 +318,19 @@ export default function TicketPage() {
                 )}
             </div>
 
+            {/* Botón Regresar (abajo, dentro del contenido) */}
+            <div className="px-4 pb-4">
+                <button
+                    onClick={() => { setHoldOrderId(null); setScreen('pos') }}
+                    aria-label="Volver al POS"
+                    className="w-full bg-slate-700 hover:bg-slate-600 active:scale-[0.98] text-white font-bold py-4 px-6 rounded-2xl transition-all text-base"
+                >
+                    ← Regresar
+                </button>
+            </div>
+
             {/* Botón Cobrar */}
-            <div className="fixed bottom-0 left-0 right-0 p-4">
+            <div className="fixed bottom-0 left-0 right-0 p-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
                 <button
                     onClick={handlePay}
                     disabled={!canPay() || saving}
