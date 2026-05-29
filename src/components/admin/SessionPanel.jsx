@@ -5,7 +5,7 @@ import { db } from '../../firebase'
 import { DEFAULT_ADMIN_UID } from '../../context/AuthContext'
 import { useSession } from '../../context/SessionContext'
 import { useSalesReport } from '../../hooks/useSalesReport'
-import { closeSession } from '../../services/sessionService'
+import { closeSession, updateSessionRate } from '../../services/sessionService'
 import { formatUSD } from '../../utils/money'
 import { useToast } from '../Toast'
 
@@ -21,6 +21,8 @@ export default function SessionPanel({ onSessionOpen }) {
     const [bcvLoading, setBcvLoading] = useState(true)
     const [closing, setClosing] = useState(false)
     const [confirm, setConfirm] = useState(false)
+    const [newRate, setNewRate] = useState('')
+    const [updating, setUpdating] = useState(false)
 
     useEffect(() => {
         fetch('https://ve.dolarapi.com/v1/dolares/oficial')
@@ -56,6 +58,23 @@ export default function SessionPanel({ onSessionOpen }) {
             console.error(err)
         } finally {
             setOpening(false)
+        }
+    }
+
+    const handleUpdateRate = async () => {
+        const val = parseFloat(newRate)
+        if (isNaN(val) || val <= 0) return
+        setUpdating(true)
+        try {
+            await updateSessionRate(session.id, val)
+            setSession(s => ({ ...s, exchangeRateBs: val }))
+            setNewRate('')
+            toast.success('Tasa actualizada')
+        } catch (err) {
+            console.error(err)
+            toast.error('Error actualizando la tasa.')
+        } finally {
+            setUpdating(false)
         }
     }
 
@@ -131,6 +150,29 @@ export default function SessionPanel({ onSessionOpen }) {
                                 ))}
                             </div>
                         )}
+
+                        <div className="bg-[#0F172A] rounded-xl p-4 space-y-2">
+                            <p className="text-white font-bold text-xs">Actualizar Tasa</p>
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
+                                    <input
+                                        type="number" step="0.01" min="1"
+                                        value={newRate}
+                                        onChange={e => setNewRate(e.target.value)}
+                                        className="input-field pl-10"
+                                        placeholder={session.exchangeRateBs.toFixed(2)}
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleUpdateRate}
+                                    disabled={updating || !newRate}
+                                    className="btn-primary whitespace-nowrap disabled:opacity-40"
+                                >
+                                    {updating ? '...' : 'Actualizar'}
+                                </button>
+                            </div>
+                        </div>
 
                         {!confirm ? (
                             <button onClick={() => setConfirm(true)} className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition-colors mt-1 text-sm">
