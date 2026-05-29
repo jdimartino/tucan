@@ -1,7 +1,7 @@
 // src/hooks/useSalesReport.js
-// Consulta las órdenes de una sesión específica en tiempo real
+// Consulta las órdenes de una sesión en tiempo real
 import { useState, useEffect } from 'react'
-import { collection, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, orderBy, getDocs, Timestamp } from 'firebase/firestore'
 import { db } from '../firebase'
 
 export function useSalesReport(sessionId) {
@@ -9,27 +9,37 @@ export function useSalesReport(sessionId) {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!sessionId) { setLoading(false); return }
+        let q
 
-        const q = query(
-            collection(db, 'orders'),
-            where('sessionId', '==', sessionId),
-            where('status', '==', 'paid'),
-            orderBy('createdAt', 'desc')
-        )
+        if (sessionId) {
+            q = query(
+                collection(db, 'orders'),
+                where('sessionId', '==', sessionId),
+                where('status', '==', 'paid'),
+                orderBy('createdAt', 'desc')
+            )
+        } else {
+            const today = new Date().toISOString().slice(0, 10)
+            const startTs = Timestamp.fromDate(new Date(today + 'T00:00:00'))
+            const endTs = Timestamp.fromDate(new Date(today + 'T23:59:59'))
+            q = query(
+                collection(db, 'orders'),
+                where('status', '==', 'paid'),
+                where('createdAt', '>=', startTs),
+                where('createdAt', '<=', endTs),
+                orderBy('createdAt', 'desc')
+            )
+        }
 
         const unsub = onSnapshot(q, async (snap) => {
             const rawOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-            // Para órdenes sin paymentMethod en el doc principal (creadas antes del fix),
-            // leer la subcollección payments/p1
             const enriched = await Promise.all(rawOrders.map(async (o) => {
-                // Leer subcol si falta paymentMethod (orden antigua) o si es mixto (necesitamos paidUSD/paidBS)
-                const needsSubcol = !o.paymentMethod || o.paymentMethod === 'mixed'
+                const needsSubcol = o.method === 'mixed' || !o.method
                 if (!needsSubcol) return o
                 const paySnap = await getDocs(collection(db, 'orders', o.id, 'payments'))
                 const payData = paySnap.docs[0]?.data()
-                return { ...o, paymentMethod: o.paymentMethod || payData?.method, paymentData: payData }
+                return { ...o, paymentMethod: o.method || payData?.method, paymentData: payData }
             }))
 
             setOrders(enriched)
@@ -38,7 +48,6 @@ export function useSalesReport(sessionId) {
         return unsub
     }, [sessionId])
 
-    // Totales calculados
     const totalCents = orders.reduce((s, o) => s + (o.totalCents || 0), 0)
     const totalUSD = totalCents / 100
     const totalTx = orders.length

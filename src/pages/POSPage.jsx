@@ -235,7 +235,7 @@ function ProductCard({ product, qty, rate, onAdd, onRemove }) {
         <div className={`bg-[#1E293B] rounded-2xl p-3 relative flex flex-col transition-all border ${qty > 0 ? 'border-blue-500/40' : 'border-white/5'}`}>
             {/* Badge cantidad */}
             {qty > 0 && (
-                <span className="absolute top-2 right-2 bg-blue-600 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs font-extrabold w-7 h-7 rounded-full flex items-center justify-center shadow-lg z-10">
                     {qty}
                 </span>
             )}
