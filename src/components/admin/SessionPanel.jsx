@@ -154,9 +154,15 @@ export default function SessionPanel({ onSessionOpen }) {
                         <div className="bg-[#0F172A] rounded-xl p-4 space-y-2">
                             <p className="text-white font-bold text-xs">
                                 Actualizar Tasa
-                                <span className="ml-2 text-slate-500 font-normal">
-                                    (actual: Bs {session.exchangeRateBs}/$)
-                                </span>
+                                {bcvRate ? (
+                                    <span className="ml-2 text-emerald-400/70 font-normal">
+                                        BCV: Bs {bcvRate.toFixed(2)}/$
+                                    </span>
+                                ) : (
+                                    <span className="ml-2 text-slate-500 font-normal">
+                                        (sin tasa BCV)
+                                    </span>
+                                )}
                             </p>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
