@@ -47,6 +47,12 @@ export default function POSPage() {
                     >
                         🏪 Abrir Caja
                     </button>
+                    <button
+                        onClick={() => setScreen('admin')}
+                        className="w-full bg-slate-700 hover:bg-slate-600 active:scale-[0.98] text-white font-bold py-3 px-4 rounded-2xl transition-all text-sm"
+                    >
+                        📊 Administración
+                    </button>
                 </div>
             </div>
         )
