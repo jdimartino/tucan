@@ -144,6 +144,9 @@ export default function TicketPage() {
                         }
                     </div>
                     <p className="text-slate-500 text-[11px] mt-0.5">{items.length} producto{items.length !== 1 ? 's' : ''}</p>
+                    <p className="text-[11px] font-bold px-2 py-0.5 rounded-full mt-0.5 inline-flex" style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}>
+                        Bs {rate}/$
+                    </p>
                 </div>
                 <div className="ml-auto text-right">
                     <p className="text-blue-400 font-extrabold text-lg leading-none">{formatUSD(totalCents)}</p>

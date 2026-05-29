@@ -51,12 +51,17 @@ export default function AdminPage() {
                             </button>
                         </>
                     ) : (
-                        <button
-                            onClick={() => setShowPosPrompt(true)}
-                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-600/20 text-slate-400 hover:bg-slate-600/30 transition-colors"
-                        >
-                            🏠 POS
-                        </button>
+                        <>
+                            <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/20">
+                                —
+                            </span>
+                            <button
+                                onClick={() => setShowPosPrompt(true)}
+                                className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-600/20 text-slate-400 hover:bg-slate-600/30 transition-colors"
+                            >
+                                🏠 POS
+                            </button>
+                        </>
                     )}
                 </div>
             </header>

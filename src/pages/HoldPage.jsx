@@ -189,6 +189,9 @@ export default function HoldPage() {
                 <div>
                     <p className="text-white font-bold text-sm leading-none">⏳ Factura en Espera</p>
                     <p className="text-slate-500 text-[10px] mt-0.5">Guarda o retoma una cuenta</p>
+                    <p className="text-[11px] font-bold px-2 py-0.5 rounded-full mt-0.5 inline-flex" style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}>
+                        Bs {rate}/$
+                    </p>
                 </div>
                 <button
                     onClick={() => setScreen('pos')}

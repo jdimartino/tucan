@@ -9,7 +9,31 @@ export default function SuccessPage() {
     const { session } = useSession()
 
     return (
-        <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-center">
+        <div className="min-h-screen bg-[#0F172A] flex flex-col">
+
+            {/* Header */}
+            <header className="bg-[#1E293B] border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <TucanIcon className="w-5 h-5" />
+                        <p className="text-white font-bold text-sm leading-none">Pago Exitoso</p>
+                    </div>
+                    {session?.exchangeRateBs && (
+                        <p className="text-[11px] font-bold px-2 py-0.5 rounded-full mt-0.5 inline-flex" style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' }}>
+                            Bs {session.exchangeRateBs}/$
+                        </p>
+                    )}
+                </div>
+                <button
+                    onClick={() => setScreen('pos')}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+                >
+                    🏠 POS
+                </button>
+            </header>
+
+            {/* Content centrado */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
 
             {/* Icono animado */}
             <div className="relative mb-6">
@@ -127,6 +151,8 @@ export default function SuccessPage() {
             <p className="text-slate-600 text-xs mt-6">
                 Orden guardada en Firestore · {new Date().toLocaleTimeString('es-VE')}
             </p>
+
+            </div>
         </div>
     )
 }
