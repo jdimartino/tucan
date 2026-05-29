@@ -96,13 +96,14 @@
 
     <button id="seedBtn" onclick="runSeed()">🌱 Agregar Cocteles</button>
     <div id="status"></div>
+    <button onclick="verifyProducts()" style="margin-top:0.75rem;width:100%;background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:1rem;padding:0.6rem;font-size:0.8rem;font-weight:700;color:#64748b;cursor:pointer;">🔍 Verificar en Firestore</button>
 
     <button class="danger" onclick="if(confirm('¿Eliminar este archivo?')) { fetch('./seed.html', {method:'DELETE'}).then(() => location.reload()).catch(() => { const s=document.getElementById('status'); s.className='status error'; s.textContent='No se pudo eliminar desde el navegador.'; }) }">🗑️ Eliminar este archivo</button>
   </div>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js'
-    import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js'
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js'
+    import { getFirestore, collection, addDoc, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js'
 
     const firebaseConfig = {
       apiKey: "AIzaSyBhJJ019TKbRlgNvKzSa2VkdG-gKhm9wlU",
@@ -136,7 +137,7 @@
         for (const p of cocktails) {
           await addDoc(collection(db, 'products'), {
             ...p,
-            createdAt: serverTimestamp(),
+            createdAt: new Date().toISOString(),
           })
           status.textContent = `✅ Agregado: ${p.name}`
           await new Promise(r => setTimeout(r, 400))
@@ -150,6 +151,25 @@
         status.textContent = `❌ Error: ${err.message}`
         btn.disabled = false
         btn.textContent = '🔄 Reintentar'
+      }
+    }
+
+    window.verifyProducts = async () => {
+      const status = document.getElementById('status')
+      status.className = 'status info'
+      status.textContent = 'Consultando Firestore...'
+      try {
+        const snap = await getDocs(query(collection(db, 'products'), where('category', '==', 'Cocteles')))
+        if (snap.empty) {
+          status.className = 'status error'
+          status.textContent = '⚠️ No hay productos con categoría "Cocteles" en Firestore.'
+        } else {
+          status.className = 'status success'
+          status.textContent = `✅ Encontrados: ${snap.docs.map(d => d.data().name).join(', ')}`
+        }
+      } catch (err) {
+        status.className = 'status error'
+        status.textContent = `❌ Error verificando: ${err.message}`
       }
     }
   </script>
