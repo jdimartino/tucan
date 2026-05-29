@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seed Cocteles — TucanApp</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0F172A;
+      color: #e2e8f0;
+      min-h-screen;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #1E293B;
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 1.5rem;
+      padding: 2.5rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .emoji { font-size: 3rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+    p { color: #94a3b8; font-size: 0.9rem; margin-bottom: 2rem; }
+    .products {
+      background: #0F172A;
+      border-radius: 1rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .product {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.85rem;
+    }
+    .product:last-child { border-bottom: none; }
+    .product-name { color: #cbd5e1; }
+    .product-price { color: #60a5fa; font-weight: 700; }
+    button {
+      width: 100%;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 1rem;
+      padding: 1rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover:not(:disabled) { background: #22c55e; }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    button.danger {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #64748b;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      padding: 0.6rem;
+    }
+    button.danger:hover { background: rgba(255,255,255,0.05); }
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .status.success { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .status.error { background: rgba(239,68,68,0.15); color: #f87171; }
+    .status.info { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="emoji">🍹</div>
+    <h1>Seed: 5 Cocteles</h1>
+    <p>Agrega 5 cócteles a $3.00 USD — categoría "Cocteles". Los productos existentes no se tocan.</p>
+
+    <div class="products">
+      <div class="product"><span class="product-name">🍹 Pasión Tropical</span><span class="product-price">$3.00</span></div>
+      <div class="product"><span class="product-name">🍹 Mar Caribe</span><span class="product-price">$3.00</span></div>
+      <div class="product"><span class="product-name">🍹 Moscow Mule</span><span class="product-price">$3.00</span></div>
+      <div class="product"><span class="product-name">🍹 Mojito</span><span class="product-price">$3.00</span></div>
+      <div class="product"><span class="product-name">🍹 Cuba Libre</span><span class="product-price">$3.00</span></div>
+    </div>
+
+    <button id="seedBtn" onclick="runSeed()">🌱 Agregar Cocteles</button>
+    <div id="status"></div>
+
+    <button class="danger" onclick="if(confirm('¿Eliminar este archivo?')) { fetch('./seed.html', {method:'DELETE'}).then(() => location.reload()).catch(() => { const s=document.getElementById('status'); s.className='status error'; s.textContent='No se pudo eliminar desde el navegador.'; }) }">🗑️ Eliminar este archivo</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js'
+    import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js'
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBhJJ019TKbRlgNvKzSa2VkdG-gKhm9wlU",
+      authDomain: "tucanapp-pos.firebaseapp.com",
+      projectId: "tucanapp-pos",
+      storageBucket: "tucanapp-pos.firebasestorage.app",
+      messagingSenderId: "833846886165",
+      appId: "1:833846886165:web:28746819de42fbddd1331c"
+    }
+
+    const app = initializeApp(firebaseConfig)
+    const db = getFirestore(app)
+
+    const cocktails = [
+      { name: 'Pasión Tropical', priceUSD: 3.00, emoji: '🍹', category: 'Cocteles', active: true },
+      { name: 'Mar Caribe',      priceUSD: 3.00, emoji: '🍹', category: 'Cocteles', active: true },
+      { name: 'Moscow Mule',     priceUSD: 3.00, emoji: '🍹', category: 'Cocteles', active: true },
+      { name: 'Mojito',         priceUSD: 3.00, emoji: '🍹', category: 'Cocteles', active: true },
+      { name: 'Cuba Libre',     priceUSD: 3.00, emoji: '🍹', category: 'Cocteles', active: true },
+    ]
+
+    window.runSeed = async () => {
+      const btn = document.getElementById('seedBtn')
+      const status = document.getElementById('status')
+      btn.disabled = true
+      btn.textContent = '⏳ Agregando...'
+      status.className = 'status info'
+      status.textContent = 'Conectando con Firestore...'
+
+      try {
+        for (const p of cocktails) {
+          await addDoc(collection(db, 'products'), {
+            ...p,
+            createdAt: serverTimestamp(),
+          })
+          status.textContent = `✅ Agregado: ${p.name}`
+          await new Promise(r => setTimeout(r, 400))
+        }
+        status.className = 'status success'
+        status.textContent = `🎉 ¡Listo! 5 cócteles agregados. Recarga la app para verlos.`
+        btn.textContent = '✅ Listo'
+      } catch (err) {
+        console.error(err)
+        status.className = 'status error'
+        status.textContent = `❌ Error: ${err.message}`
+        btn.disabled = false
+        btn.textContent = '🔄 Reintentar'
+      }
+    }
+  </script>
+</body>
+</html>
