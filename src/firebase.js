@@ -21,11 +21,17 @@ const app = initializeApp(firebaseConfig)
 export const db = getFirestore(app)
 export const auth = getAuth(app)
 
-// Persistencia offline (Firestore offline-first)
-enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-        console.warn('Firestore offline: múltiples pestañas abiertas')
-    } else if (err.code === 'unimplemented') {
-        console.warn('Firestore offline: navegador no soportado')
-    }
-})
+// Persistencia offline con delay para evitar race condition con listeners
+setTimeout(() => {
+    enableIndexedDbPersistence(db).then(() => {
+        console.log('Firestore offline: persistencia habilitada')
+    }).catch((err) => {
+        if (err.code === 'failed-precondition') {
+            console.warn('Firestore offline: múltiples pestañas abiertas')
+        } else if (err.code === 'unimplemented') {
+            console.warn('Firestore offline: navegador no soportado')
+        } else {
+            console.warn('Firestore offline: error', err.code)
+        }
+    })
+}, 1000)

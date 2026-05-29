@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react'
 import { collection, query, where, limit, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
-import { useAuth } from '../context/AuthContext'
+import { DEFAULT_ADMIN_UID } from '../context/AuthContext'
 import { useSession } from '../context/SessionContext'
 
 export function useSessionSync() {
-    const { user } = useAuth()
     const { session, setSession } = useSession()
-    const [recovering, setRecovering] = useState(!session && !!user)
+    const [recovering, setRecovering] = useState(!session)
 
     useEffect(() => {
-        if (!user || session) { setRecovering(false); return }
+        if (session) { setRecovering(false); return }
 
         const q = query(
             collection(db, 'sessions'),
-            where('cashierId', '==', user.uid),
+            where('cashierId', '==', DEFAULT_ADMIN_UID),
             where('status', '==', 'open'),
             limit(1)
         )
@@ -28,7 +27,7 @@ export function useSessionSync() {
             })
             .catch((err) => console.error('Session recovery failed:', err))
             .finally(() => setRecovering(false))
-    }, [user?.uid])
+    }, [])
 
     return { recovering }
 }
