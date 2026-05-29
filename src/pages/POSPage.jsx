@@ -1,8 +1,5 @@
 // src/pages/POSPage.jsx
 import { useState, useMemo } from 'react'
-import { signOut } from 'firebase/auth'
-import { auth } from '../firebase'
-import { useAuth } from '../context/AuthContext'
 import { useSession } from '../context/SessionContext'
 import { useCart } from '../context/CartContext'
 import { useNav } from '../context/NavigationContext'
@@ -15,7 +12,6 @@ import { formatUSD } from '../utils/money'
 const ALL = 'Todos'
 
 export default function POSPage() {
-    const { user, role } = useAuth()
     const { session } = useSession()
     const { items, totalCents, itemCount, dispatch } = useCart()
     const { setScreen, setAdminTab } = useNav()
@@ -57,8 +53,11 @@ export default function POSPage() {
                     >
                         📊 Administración
                     </button>
-                    <button onClick={() => signOut(auth)} className="btn-secondary text-sm">
-                        ← Cerrar Sesión
+                    <button
+                        onClick={() => setScreen('admin')}
+                        className="w-full bg-slate-700 hover:bg-slate-600 active:scale-[0.98] text-white font-bold py-3 px-4 rounded-2xl transition-all text-sm"
+                    >
+                        📊 Administración
                     </button>
                 </div>
             </div>
@@ -79,7 +78,7 @@ export default function POSPage() {
                             </span>
                         )}
                     </p>
-                    <p className="text-slate-500 text-[10px] leading-none mt-0.5">{user?.email}</p>
+                    <p className="text-slate-500 text-[10px] leading-none mt-0.5">Modo prueba</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {holdCount > 0 && (
@@ -91,26 +90,12 @@ export default function POSPage() {
                             ⏳ <span className="hidden sm:inline">En espera:</span> {holdCount}
                         </button>
                     )}
-                    {session?.exchangeRateBs && (
-                        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
-                            Bs {session.exchangeRateBs}/$
-                        </span>
-                    )}
-                    {role === 'admin' && (
-                        <button
-                            onClick={() => setScreen?.('admin')}
-                            aria-label="Panel de administración"
-                            className="text-xs text-slate-400 hover:text-blue-400 transition-colors font-semibold px-2 py-1 rounded-lg hover:bg-blue-500/10"
-                        >
-                            ⚙️
-                        </button>
-                    )}
                     <button
-                        onClick={() => signOut(auth)}
-                        aria-label="Cerrar sesión"
-                        className="text-xs text-slate-400 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 font-semibold"
+                        onClick={() => setScreen('admin')}
+                        aria-label="Panel de administración"
+                        className="text-xs text-slate-400 hover:text-blue-400 transition-colors font-semibold px-2 py-1 rounded-lg hover:bg-blue-500/10"
                     >
-                        Salir
+                        ⚙️
                     </button>
                 </div>
             </header>

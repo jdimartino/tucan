@@ -1,7 +1,4 @@
 // src/pages/AdminPage.jsx
-import { signOut } from 'firebase/auth'
-import { auth } from '../firebase'
-import { useAuth } from '../context/AuthContext'
 import { useSession } from '../context/SessionContext'
 import { useNav } from '../context/NavigationContext'
 import TucanIcon from '../components/TucanIcon'
@@ -18,11 +15,8 @@ const TABS = [
 ]
 
 export default function AdminPage() {
-    const { user, role } = useAuth()
     const { session } = useSession()
     const { setScreen, adminTab, setAdminTab } = useNav()
-
-    if (role !== 'admin') return null
 
     return (
         <div className="min-h-screen bg-[#1E1040] flex flex-col">
@@ -32,7 +26,7 @@ export default function AdminPage() {
                     <TucanIcon className="w-7 h-7" />
                     <div>
                         <p className="text-white font-bold text-sm leading-none">TucanApp Admin</p>
-                        <p className="text-slate-500 text-[10px] leading-none mt-0.5">{user?.email}</p>
+                        <p className="text-slate-500 text-[10px] leading-none mt-0.5">Modo prueba</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -49,12 +43,6 @@ export default function AdminPage() {
                             </button>
                         </>
                     )}
-                    <button
-                        onClick={() => signOut(auth)}
-                        className="text-xs text-slate-400 hover:text-red-400 transition-colors font-semibold px-2 py-1 rounded-lg hover:bg-red-500/10"
-                    >
-                        Salir
-                    </button>
                 </div>
             </header>
 
