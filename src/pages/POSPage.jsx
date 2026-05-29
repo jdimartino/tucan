@@ -18,12 +18,13 @@ export default function POSPage() {
     const { user, role } = useAuth()
     const { session } = useSession()
     const { items, totalCents, itemCount, dispatch } = useCart()
-    const { setScreen } = useNav()
+    const { setScreen, setAdminTab } = useNav()
     const { products, loading } = useProducts()
-    const { orders: holdOrders } = useOpenOrders(session?.id)
+    const { orders: holdOrders } = useOpenOrders()
     const isOnline = useOnlineStatus()
     const holdCount = holdOrders?.length || 0
     const [activeCategory, setActiveCategory] = useState(ALL)
+    const [cartCollapsed, setCartCollapsed] = useState(true)
 
     // Extraer categorías únicas de productos activos
     const categories = useMemo(() => {
@@ -36,19 +37,26 @@ export default function POSPage() {
         (activeCategory === ALL || p.category === activeCategory)
     ), [products, activeCategory])
 
-    // Guardia: si no hay sesión activa, pedir abrir caja
+    // Guardia: si no hay sesión activa, dejar pasar a admin/reportes pero bloquear facturación
     if (session?.status !== 'open' && !loading) {
         return (
             <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-center">
                 <div className="text-5xl mb-4">🏪</div>
                 <h2 className="text-white text-xl font-bold mb-2">Caja cerrada</h2>
-                <p className="text-slate-400 text-sm mb-6">Pide al Admin que abra la caja del día antes de facturar.</p>
-                <div className="flex flex-col gap-2 w-full max-w-xs">
-                    {role === 'admin' && (
-                        <button onClick={() => setScreen('admin')} className="btn-primary text-sm">
-                            ⚙️ Ir al Panel Admin
-                        </button>
-                    )}
+                <p className="text-slate-400 text-sm mb-8">Puedes revisar reportes y administración, o abrir la caja para facturar.</p>
+                <div className="flex flex-col gap-3 w-full max-w-xs">
+                    <button
+                        onClick={() => { setAdminTab('caja'); setScreen('admin') }}
+                        className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-extrabold py-3.5 px-4 rounded-2xl transition-all shadow-lg shadow-blue-600/30 text-sm"
+                    >
+                        🏪 Abrir Caja
+                    </button>
+                    <button
+                        onClick={() => setScreen('admin')}
+                        className="w-full bg-slate-700 hover:bg-slate-600 active:scale-[0.98] text-white font-bold py-3 px-4 rounded-2xl transition-all text-sm"
+                    >
+                        📊 Administración
+                    </button>
                     <button onClick={() => signOut(auth)} className="btn-secondary text-sm">
                         ← Cerrar Sesión
                     </button>
@@ -172,36 +180,44 @@ export default function POSPage() {
 
             {/* ── Cart Bar flotante inferior ── */}
             {itemCount > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 z-20 p-4">
+                <div className="fixed bottom-0 left-0 right-0 z-20 p-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
                     <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-3 shadow-2xl flex flex-col gap-2">
 
-                        {/* Info: ítems + emojis + total */}
-                        <div className="flex items-center justify-between px-1">
+                        {/* Info: ítems + emojis + total (clickeable) */}
+                        <div
+                            className="flex items-center justify-between px-1 cursor-pointer select-none"
+                            onClick={() => setCartCollapsed(c => !c)}
+                        >
                             <span className="text-white font-extrabold text-lg leading-none">{formatUSD(totalCents)}</span>
-                            <span className="text-slate-400 text-xs">{itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}</span>
+                            <span className="text-slate-400 text-xs flex items-center gap-1">
+                                {itemCount} {itemCount === 1 ? 'ítem' : 'ítems'}
+                                <span className="text-slate-600 text-[11px]">{cartCollapsed ? '▲' : '▼'}</span>
+                            </span>
                         </div>
 
-                        {/* Lista vertical de ítems */}
-                        <div className="w-full flex flex-col gap-1 max-h-28 overflow-y-auto">
-                            {items.map(item => (
-                                <div key={item.productId} className="flex items-center justify-between px-1 gap-2">
-                                    <span className="text-xs text-slate-300 flex items-center gap-1.5 flex-1 min-w-0">
-                                        <span>{item.emoji}</span>
-                                        <span className="truncate">{item.qty}× {item.name}</span>
-                                    </span>
-                                    <span className="text-xs font-bold text-blue-400 shrink-0">
-                                        {formatUSD(item.subtotalCents)}
-                                    </span>
-                                    <button
-                                        onPointerDown={e => { e.stopPropagation(); dispatch({ type: 'DECREMENT_ITEM', payload: item.productId }) }}
-                                        className="shrink-0 w-5 h-5 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all text-xs font-bold leading-none flex items-center justify-center"
-                                        aria-label={`Quitar ${item.name}`}
-                                    >
-                                        −
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                        {/* Lista vertical de ítems (colapsable) */}
+                        {!cartCollapsed && (
+                            <div className="w-full flex flex-col gap-1 max-h-40 overflow-y-auto">
+                                {items.map(item => (
+                                    <div key={item.productId} className="flex items-center justify-between px-1 gap-2">
+                                        <span className="text-xs text-slate-300 flex items-center gap-1.5 flex-1 min-w-0">
+                                            <span>{item.emoji}</span>
+                                            <span className="truncate">{item.qty}× {item.name}</span>
+                                        </span>
+                                        <span className="text-xs font-bold text-blue-400 shrink-0">
+                                            {formatUSD(item.subtotalCents)}
+                                        </span>
+                                        <button
+                                            onPointerDown={e => { e.stopPropagation(); dispatch({ type: 'DECREMENT_ITEM', payload: item.productId }) }}
+                                            className="shrink-0 w-5 h-5 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 active:scale-90 transition-all text-xs font-bold leading-none flex items-center justify-center"
+                                            aria-label={`Quitar ${item.name}`}
+                                        >
+                                            −
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Botones de acción */}
                         <div className="flex gap-2 mt-1">

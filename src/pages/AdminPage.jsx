@@ -1,5 +1,4 @@
 // src/pages/AdminPage.jsx
-import { useState } from 'react'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase'
 import { useAuth } from '../context/AuthContext'
@@ -19,10 +18,9 @@ const TABS = [
 ]
 
 export default function AdminPage() {
-    const [activeTab, setActiveTab] = useState('products')
     const { user, role } = useAuth()
     const { session } = useSession()
-    const { setScreen } = useNav()
+    const { setScreen, adminTab, setAdminTab } = useNav()
 
     if (role !== 'admin') return null
 
@@ -66,8 +64,8 @@ export default function AdminPage() {
                     {TABS.map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 text-xs font-bold py-2 px-2 rounded-xl transition-all whitespace-nowrap ${activeTab === tab.id
+                            onClick={() => setAdminTab(tab.id)}
+                            className={`flex-1 text-xs font-bold py-2 px-2 rounded-xl transition-all whitespace-nowrap ${adminTab === tab.id
                                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                                     : 'text-slate-400 hover:text-slate-200'
                                 }`}
@@ -80,10 +78,10 @@ export default function AdminPage() {
 
             {/* Content */}
             <main className="flex-1 p-4 overflow-auto">
-                {activeTab === 'products' && <ProductList />}
-                {activeTab === 'users' && <UserList />}
-                {activeTab === 'caja' && <SessionPanel onSessionOpen={() => setActiveTab('products')} />}
-                {activeTab === 'report' && <ReportPage onBack={() => setActiveTab('caja')} />}
+                {adminTab === 'products' && <ProductList />}
+                {adminTab === 'users' && <UserList />}
+                {adminTab === 'caja' && <SessionPanel onSessionOpen={() => setAdminTab('products')} />}
+                {adminTab === 'report' && <ReportPage onBack={() => setAdminTab('caja')} />}
             </main>
         </div>
     )

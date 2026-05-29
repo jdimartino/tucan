@@ -4,15 +4,16 @@ import { createContext, useContext, useState } from 'react'
 
 const NavContext = createContext(null)
 
-// screens: 'pos' | 'ticket' | 'success'
+// screens: 'pos' | 'ticket' | 'success' | 'hold' | 'admin'
 export function NavigationProvider({ children }) {
     const [screen, setScreen] = useState('pos')
+    const [adminTab, setAdminTab] = useState('products')
     const [lastOrderId, setOrderId] = useState(null)
     const [lastOrderData, setLastOrderData] = useState(null)
     const [holdOrderId, setHoldOrderId] = useState(null)
 
     return (
-        <NavContext.Provider value={{ screen, setScreen, lastOrderId, setOrderId, lastOrderData, setLastOrderData, holdOrderId, setHoldOrderId }}>
+        <NavContext.Provider value={{ screen, setScreen, adminTab, setAdminTab, lastOrderId, setOrderId, lastOrderData, setLastOrderData, holdOrderId, setHoldOrderId }}>
             {children}
         </NavContext.Provider>
     )

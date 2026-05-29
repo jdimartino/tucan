@@ -1,6 +1,6 @@
 // src/services/orderService.js
 import {
-    collection, doc, updateDoc,
+    collection, doc, updateDoc, deleteDoc,
     serverTimestamp, query, where, getDocs,
     writeBatch, runTransaction,
 } from 'firebase/firestore'
@@ -68,7 +68,7 @@ export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, p
  * Guarda una Factura en Espera (cuenta abierta) en Firestore usando writeBatch.
  * mode: 'tab' / status: 'open'
  */
-export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, items, client }) {
+export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, items, client, notes }) {
     const orderRef = doc(collection(db, 'orders'))
     const batch = writeBatch(db)
 
@@ -79,6 +79,7 @@ export async function saveHoldOrder({ cashierId, sessionId, exchangeRateBs, item
         status: 'open',
         mode: 'tab',
         client: { name: client.name.trim(), phone: client.phone.trim() },
+        notes: notes?.trim() || '',
         totalCents: items.reduce((s, i) => s + i.subtotalCents, 0),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -196,5 +197,50 @@ export async function appendHoldOrder(orderId, items) {
                 })
             }
         }
+    })
+}
+
+/**
+ * Reemplaza todos los ítems de una cuenta en espera (actualización completa).
+ */
+export async function updateHoldOrder(orderId, items) {
+    const batch = writeBatch(db)
+    const orderRef = doc(db, 'orders', orderId)
+    const totalCents = items.reduce((s, i) => s + i.subtotalCents, 0)
+
+    batch.update(orderRef, { totalCents, updatedAt: serverTimestamp() })
+
+    const existingSnap = await getDocs(collection(db, 'orders', orderId, 'items'))
+    const existingIds = new Set(existingSnap.docs.map(d => d.id))
+    const newIds = new Set(items.map(i => i.productId))
+
+    for (const id of existingIds) {
+        if (!newIds.has(id)) {
+            batch.delete(doc(db, 'orders', orderId, 'items', id))
+        }
+    }
+
+    for (const item of items) {
+        const itemRef = doc(db, 'orders', orderId, 'items', item.productId)
+        batch.set(itemRef, {
+            name: item.name,
+            emoji: item.emoji,
+            qty: item.qty,
+            unitPriceCents: item.unitPriceCents,
+            subtotalCents: item.subtotalCents,
+        })
+    }
+
+    await batch.commit()
+}
+
+/**
+ * Anula una factura ya cobrada (la marca como voided sin cambiar su status,
+ * para que siga apareciendo en reportes pero sin contar en los totales).
+ */
+export async function voidOrder(orderId) {
+    return updateDoc(doc(db, 'orders', orderId), {
+        voided: true,
+        voidedAt: serverTimestamp(),
     })
 }
