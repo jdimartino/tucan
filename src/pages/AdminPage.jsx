@@ -34,7 +34,7 @@ export default function AdminPage() {
                     <TucanIcon className="w-7 h-7" />
                     <div>
                         <p className="text-white font-bold text-sm leading-none">TucanApp Admin</p>
-                        <p className="text-slate-500 text-[10px] leading-none mt-0.5">Modo prueba</p>
+                        <p className="text-slate-400 text-[11px] leading-none mt-0.5 font-semibold">By JDM</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
