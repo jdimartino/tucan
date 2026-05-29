@@ -152,7 +152,12 @@ export default function SessionPanel({ onSessionOpen }) {
                         )}
 
                         <div className="bg-[#0F172A] rounded-xl p-4 space-y-2">
-                            <p className="text-white font-bold text-xs">Actualizar Tasa</p>
+                            <p className="text-white font-bold text-xs">
+                                Actualizar Tasa
+                                <span className="ml-2 text-slate-500 font-normal">
+                                    (actual: Bs {session.exchangeRateBs}/$)
+                                </span>
+                            </p>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>

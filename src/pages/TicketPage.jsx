@@ -9,9 +9,10 @@ import { formatUSD, formatBsNum, toCents, fromCents, calcChange } from '../utils
 import { useToast } from '../components/Toast'
 
 const METHODS = [
-    { id: 'usd_cash', label: 'Cash USD', icon: '💵' },
+    { id: 'usd_cash', label: 'Efectivo USD', icon: '💵' },
     { id: 'bs_cash', label: 'Efectivo BS', icon: '💴' },
     { id: 'pago_movil', label: 'Pago Móvil', icon: '📲' },
+    { id: 'pos', label: 'Punto de Venta', icon: '💳' },
     { id: 'mixed', label: 'Mixto', icon: '🔀' },
 ]
 
@@ -25,6 +26,7 @@ export default function TicketPage() {
     const [method, setMethod] = useState('usd_cash')
     const [paid, setPaid] = useState('')
     const [paidBS, setPaidBS] = useState('')
+    const [paidPOS, setPaidPOS] = useState('')
     const [saving, setSaving] = useState(false)
     const [invoiceNum, setInvoiceNum] = useState(null)
     const [reference, setReference] = useState('')
@@ -59,6 +61,12 @@ export default function TicketPage() {
             const ch = calcChange(paidBsCents, totalBsCents)
             return ch > 0 ? { label: 'Vuelto', value: `Bs ${fromCents(ch).toFixed(2)}` } : null
         }
+        if (method === 'pos') {
+            const paidPosCents = toCents(parseFloat(paidPOS) || 0)
+            const totalBsCents = toCents(parseFloat(totalBS))
+            const ch = calcChange(paidPosCents, totalBsCents)
+            return ch > 0 ? { label: 'Vuelto', value: `Bs ${fromCents(ch).toFixed(2)}` } : null
+        }
         return null
     }, [method, paid, paidBS, totalCents, totalBS])
 
@@ -66,6 +74,7 @@ export default function TicketPage() {
         if (!session?.id) return false
         if (method === 'usd_cash') return parseFloat(paid) >= totalUSD
         if (method === 'bs_cash') return parseFloat(paidBS) >= parseFloat(totalBS)
+        if (method === 'pos') return parseFloat(paidPOS) >= parseFloat(totalBS)
         if (method === 'pago_movil') return true
         if (method === 'mixed') return !!mixedRemaining?.covered
         return false
@@ -86,6 +95,7 @@ export default function TicketPage() {
                 ...(method === 'bs_cash' && { paidBS: parseFloat(paidBS), changeBS: parseFloat(paidBS) - parseFloat(totalBS) }),
                 ...(method === 'pago_movil' && { reference }),
                 ...(method === 'mixed' && { paidUSD: parseFloat(paid) || 0, paidBS: parseFloat(paidBS) || 0 }),
+                ...(method === 'pos' && { paidPOS: parseFloat(paidPOS) }),
             }
             const orderId = await saveOrder({
                 cashierId: DEFAULT_ADMIN_UID,
@@ -248,6 +258,23 @@ export default function TicketPage() {
                 )}
 
                 {/* Pago Mixto */}
+                {method === 'pos' && (
+                    <div>
+                        <label htmlFor="paid-pos" className="label-xs">Monto cobrado por terminal (Bs.)</label>
+                        <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
+                            <input
+                                id="paid-pos"
+                                type="number" step="0.01" min={parseFloat(totalBS)}
+                                value={paidPOS}
+                                onChange={e => setPaidPOS(e.target.value)}
+                                className="input-field pl-10"
+                                placeholder={totalBS}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {method === 'mixed' && (
                     <div className="bg-[#1E293B] rounded-2xl p-4 space-y-3 border border-white/5">
                         <div>
