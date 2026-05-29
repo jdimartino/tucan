@@ -48,9 +48,10 @@ export function useSalesReport(sessionId) {
         return unsub
     }, [sessionId])
 
-    const totalCents = orders.reduce((s, o) => s + (o.totalCents || 0), 0)
+    const activeOrders = orders.filter(o => !o.voided)
+    const totalCents = activeOrders.reduce((s, o) => s + (o.totalCents || 0), 0)
     const totalUSD = totalCents / 100
-    const totalTx = orders.length
+    const totalTx = activeOrders.length
 
-    return { orders, loading, totalCents, totalUSD, totalTx }
+    return { orders, activeOrders, loading, totalCents, totalUSD, totalTx }
 }

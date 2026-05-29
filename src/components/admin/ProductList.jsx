@@ -90,7 +90,7 @@ export default function ProductList() {
                                         <button
                                             onClick={() => toggleProduct(p.id, !p.active)}
                                             aria-label={p.active ? `Desactivar ${p.name}` : `Activar ${p.name}`}
-                                            className={`text-xs px-2 py-1 rounded-lg font-bold transition-colors ${p.active ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                                            className={`text-[11px] px-2.5 py-2 rounded-lg font-bold transition-colors ${p.active ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                                         >
                                             {p.active ? '✓ Activo' : '○ Inactivo'}
                                         </button>
@@ -98,17 +98,17 @@ export default function ProductList() {
                                         <button
                                             onClick={() => { setEditing(p); setShowForm(true) }}
                                             aria-label={`Editar ${p.name}`}
-                                            className="text-xs px-2 py-1 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 font-bold transition-colors"
+                                            className="text-[11px] px-2.5 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 font-bold transition-colors"
                                         >
-                                            ✏️
+                                            ✏️ Editar
                                         </button>
                                         {/* Eliminar */}
                                         <button
                                             onClick={() => setConfirm(p.id)}
                                             aria-label={`Eliminar ${p.name}`}
-                                            className="text-xs px-2 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-colors"
+                                            className="text-[11px] px-2.5 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 font-bold transition-colors"
                                         >
-                                            🗑️
+                                            🗑️ Eliminar
                                         </button>
                                     </div>
                                 </div>
