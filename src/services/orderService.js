@@ -247,10 +247,11 @@ export async function voidOrder(orderId) {
 }
 
 /**
- * Elimina TODAS las órdenes y resetea el contador de facturas a 0.
- * No afecta productos, usuarios, sesiones ni configuración.
+ * Elimina TODAS las órdenes, sesiones y resetea el contador de facturas a 0.
+ * No afecta productos, usuarios ni configuración.
  */
 export async function resetAllOrders() {
+    // 1. Borrar todas las órdenes con sus subcolecciones
     const snap = await getDocs(collection(db, 'orders'))
     let count = 0
     for (const orderDoc of snap.docs) {
@@ -263,6 +264,14 @@ export async function resetAllOrders() {
         await batch.commit()
         count++
     }
+
+    // 2. Borrar todas las sesiones (evita sesiones huérfanas en reportes históricos)
+    const sessionSnap = await getDocs(collection(db, 'sessions'))
+    const batch = writeBatch(db)
+    sessionSnap.docs.forEach(d => batch.delete(d.ref))
+    await batch.commit()
+
+    // 3. Resetear contador de facturas
     await setDoc(doc(db, 'counters', 'invoices'), { current: 0 })
     return count
 }
