@@ -1,6 +1,6 @@
 // src/services/orderService.js
 import {
-    collection, doc, updateDoc, deleteDoc,
+    collection, doc, updateDoc, deleteDoc, setDoc,
     serverTimestamp, query, where, getDocs,
     writeBatch, runTransaction,
 } from 'firebase/firestore'
@@ -37,6 +37,7 @@ export async function saveOrder({ cashierId, sessionId, exchangeRateBs, items, p
         mode: 'fast',
         totalCents: items.reduce((s, i) => s + i.subtotalCents, 0),
         paymentMethod: payment.method,
+        paymentData: payment,
         ...(invoiceNumber != null && { invoiceNumber }),
         createdAt: serverTimestamp(),
     })
@@ -243,4 +244,25 @@ export async function voidOrder(orderId) {
         voided: true,
         voidedAt: serverTimestamp(),
     })
+}
+
+/**
+ * Elimina TODAS las órdenes y resetea el contador de facturas a 0.
+ * No afecta productos, usuarios, sesiones ni configuración.
+ */
+export async function resetAllOrders() {
+    const snap = await getDocs(collection(db, 'orders'))
+    let count = 0
+    for (const orderDoc of snap.docs) {
+        const batch = writeBatch(db)
+        const itemsSnap = await getDocs(collection(db, 'orders', orderDoc.id, 'items'))
+        itemsSnap.docs.forEach(d => batch.delete(d.ref))
+        const paySnap = await getDocs(collection(db, 'orders', orderDoc.id, 'payments'))
+        paySnap.docs.forEach(d => batch.delete(d.ref))
+        batch.delete(orderDoc.ref)
+        await batch.commit()
+        count++
+    }
+    await setDoc(doc(db, 'counters', 'invoices'), { current: 0 })
+    return count
 }

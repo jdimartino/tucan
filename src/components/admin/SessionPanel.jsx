@@ -6,7 +6,8 @@ import { DEFAULT_ADMIN_UID } from '../../context/AuthContext'
 import { useSession } from '../../context/SessionContext'
 import { useSalesReport } from '../../hooks/useSalesReport'
 import { closeSession, updateSessionRate } from '../../services/sessionService'
-import { formatUSD } from '../../utils/money'
+import { resetAllOrders } from '../../services/orderService'
+import { formatUSD, formatBsNum, fromCents } from '../../utils/money'
 import { useToast } from '../Toast'
 
 export default function SessionPanel({ onSessionOpen }) {
@@ -23,6 +24,8 @@ export default function SessionPanel({ onSessionOpen }) {
     const [confirm, setConfirm] = useState(false)
     const [newRate, setNewRate] = useState('')
     const [updating, setUpdating] = useState(false)
+    const [confirmReset, setConfirmReset] = useState(false)
+    const [resetting, setResetting] = useState(false)
 
     useEffect(() => {
         fetch('https://ve.dolarapi.com/v1/dolares/oficial')
@@ -93,6 +96,23 @@ export default function SessionPanel({ onSessionOpen }) {
         }
     }
 
+    const handleReset = async () => {
+        if (!window.confirm('⚠️ ¿Estás seguro? Se borrarán TODAS las facturas y el contador se reiniciará a #0001. Los productos, precios, métodos de pago y configuraciones se conservan.\n\nEsta acción NO se puede deshacer.')) return
+        if (!window.confirm('Confirmación final: ¿Estás ABSOLUTAMENTE seguro? Las órdenes eliminadas NO se pueden recuperar.')) return
+        setResetting(true)
+        try {
+            const count = await resetAllOrders()
+            setSession(null)
+            toast.success(`✅ Reset completo. Se eliminaron ${count} órdenes y el contador se reinició a #0001.`)
+        } catch (err) {
+            console.error(err)
+            toast.error('Error al resetear. Revisa la consola.')
+        } finally {
+            setResetting(false)
+            setConfirmReset(false)
+        }
+    }
+
     const byMethod = orders.reduce((acc, o) => {
         const m = o.paymentMethod || 'unknown'
         acc[m] = (acc[m] || 0) + (o.totalCents || 0)
@@ -142,12 +162,15 @@ export default function SessionPanel({ onSessionOpen }) {
 
                         {Object.keys(byMethod).length > 0 && (
                             <div className="space-y-1">
-                                {Object.entries(byMethod).map(([m, cents]) => (
-                                    <div key={m} className="flex justify-between text-xs">
-                                        <span className="text-slate-400">{METHOD_LABELS[m] || m}</span>
-                                        <span className="text-blue-400 font-bold">{formatUSD(cents)}</span>
-                                    </div>
-                                ))}
+                                {Object.entries(byMethod).map(([m, cents]) => {
+                                    const bs = fromCents(cents) * session.exchangeRateBs
+                                    return (
+                                        <div key={m} className="flex justify-between text-xs">
+                                            <span className="text-slate-400">{METHOD_LABELS[m] || m}</span>
+                                            <span className="text-blue-400 font-bold">{formatUSD(cents)} <span className="text-amber-400 font-semibold">≈ Bs {formatBsNum(bs)}</span></span>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         )}
 
@@ -209,6 +232,17 @@ export default function SessionPanel({ onSessionOpen }) {
                                 </div>
                             </div>
                         )}
+
+                        {/* Reset total — temporal */}
+                        <div className="border-t border-white/5 pt-4 mt-4">
+                            <button
+                                onClick={handleReset}
+                                disabled={resetting}
+                                className="w-full bg-red-600/15 hover:bg-red-600/25 border border-red-500/25 text-red-400 font-bold py-3 rounded-xl transition-all text-sm disabled:opacity-40"
+                            >
+                                {resetting ? 'Reseteando...' : '🗑️ Poner todo en cero'}
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

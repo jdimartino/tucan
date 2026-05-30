@@ -26,8 +26,11 @@ export default function TicketPage() {
     const [method, setMethod] = useState('pos')
     const [paid, setPaid] = useState('')
     const [paidBS, setPaidBS] = useState('')
-    const [mixedPayments, setMixedPayments] = useState([])
-    const [newMixMethod, setNewMixMethod] = useState('')
+    const [mixedWithUsd, setMixedWithUsd] = useState(true)
+    const [mixedUsdAmount, setMixedUsdAmount] = useState('')
+    const [mixedFirstMethod, setMixedFirstMethod] = useState('')
+    const [mixedFirstAmount, setMixedFirstAmount] = useState('')
+    const [mixedSecondMethod, setMixedSecondMethod] = useState('')
     const [saving, setSaving] = useState(false)
     const [invoiceNum, setInvoiceNum] = useState(null)
     const [reference, setReference] = useState('')
@@ -39,37 +42,46 @@ export default function TicketPage() {
     const totalUSD = useMemo(() => fromCents(totalCents), [totalCents])
     const totalBS = useMemo(() => (totalUSD * rate).toFixed(2), [totalUSD, rate])
 
-    const mixedTotalCovered = useMemo(() => {
-        if (method !== 'mixed') return false
-        const totalPaid = mixedPayments.reduce((s, mp) => s + (parseFloat(mp.amount) || 0), 0)
-        return totalPaid >= parseFloat(totalBS)
-    }, [method, mixedPayments, totalBS])
+    const mixedCoveredBs = useMemo(() => {
+        if (method !== 'mixed') return 0
+        if (mixedWithUsd) return (parseFloat(mixedUsdAmount) || 0) * rate
+        return parseFloat(mixedFirstAmount) || 0
+    }, [method, mixedWithUsd, mixedUsdAmount, mixedFirstAmount, rate])
 
     const mixedRemainingBS = useMemo(() => {
-        const totalPaid = mixedPayments.reduce((s, mp) => s + (parseFloat(mp.amount) || 0), 0)
-        return Math.max(0, parseFloat(totalBS) - totalPaid)
-    }, [method, mixedPayments, totalBS])
+        if (method !== 'mixed') return parseFloat(totalBS)
+        return Math.max(0, parseFloat(totalBS) - mixedCoveredBs)
+    }, [method, totalBS, mixedCoveredBs])
 
     const change = useMemo(() => {
         if (method === 'usd_cash') {
             const paidCents = toCents(parseFloat(paid) || 0)
             const ch = calcChange(paidCents, totalCents)
-            return ch > 0 ? { label: 'Vuelto', value: formatUSD(ch) } : null
+            if (ch <= 0) return null
+            const usdChange = fromCents(ch)
+            const bsChange = usdChange * rate
+            return { label: 'Vuelto USD', value: formatUSD(ch), bsValue: bsChange }
         }
         if (method === 'bs_cash') {
             const paidBsCents = toCents(parseFloat(paidBS) || 0)
             const totalBsCents = toCents(parseFloat(totalBS))
             const ch = calcChange(paidBsCents, totalBsCents)
-            return ch > 0 ? { label: 'Vuelto', value: `Bs ${fromCents(ch).toFixed(2)}` } : null
+            return ch > 0 ? { label: 'Vuelto BS', value: `Bs ${fromCents(ch).toFixed(2)}` } : null
         }
         return null
-    }, [method, paid, paidBS, totalCents, totalBS])
+    }, [method, paid, paidBS, totalCents, totalBS, rate])
 
     const handleMethodChange = (newMethod) => {
         setMethod(newMethod)
+        if (newMethod !== 'pago_movil' && newMethod !== 'pos') {
+            setReference('')
+        }
         if (newMethod !== 'mixed') {
-            setMixedPayments([])
-            setNewMixMethod('')
+            setMixedWithUsd(true)
+            setMixedUsdAmount('')
+            setMixedFirstMethod('')
+            setMixedFirstAmount('')
+            setMixedSecondMethod('')
         }
     }
 
@@ -79,9 +91,12 @@ export default function TicketPage() {
         if (method === 'bs_cash') return true
         if (method === 'pos') return true
         if (method === 'pago_movil') return true
-        if (method === 'mixed') return mixedTotalCovered
+        if (method === 'mixed') {
+            if (mixedWithUsd) return (parseFloat(mixedUsdAmount) || 0) > 0 && mixedSecondMethod && mixedRemainingBS >= 0
+            return mixedFirstMethod && (parseFloat(mixedFirstAmount) || 0) > 0 && mixedSecondMethod && mixedRemainingBS >= 0
+        }
         return false
-    }, [session?.id, method, mixedTotalCovered])
+    }, [session?.id, method, mixedWithUsd, mixedUsdAmount, mixedFirstMethod, mixedFirstAmount, mixedSecondMethod, mixedRemainingBS])
 
     const handlePay = async () => {
         if (!canPay()) return
@@ -97,8 +112,17 @@ export default function TicketPage() {
                 ...(method === 'usd_cash' && { paidUSD: parseFloat(paid) || totalUSD, changeUSD: Math.max(0, (parseFloat(paid) || totalUSD) - totalUSD) }),
                 ...(method === 'bs_cash' && { paidBS: parseFloat(paidBS) || parseFloat(totalBS), changeBS: Math.max(0, (parseFloat(paidBS) || parseFloat(totalBS)) - parseFloat(totalBS)) }),
                 ...(method === 'pago_movil' && { reference }),
-                ...(method === 'mixed' && { mixedPayments }),
-                ...(method === 'pos' && { paidBS: parseFloat(totalBS) }),
+                ...(method === 'mixed' && {
+                    mixedWithUsd,
+                    ...(mixedWithUsd
+                        ? { mixedUsdAmount: parseFloat(mixedUsdAmount) || 0, mixedUsdInBs: mixedCoveredBs }
+                        : { mixedFirstMethod, mixedFirstAmount: parseFloat(mixedFirstAmount) || 0 }
+                    ),
+                    mixedSecondMethod,
+                    mixedBsAmount: mixedRemainingBS,
+                    totalBS: parseFloat(totalBS),
+                }),
+                ...(method === 'pos' && { paidBS: parseFloat(totalBS), reference }),
             }
             const orderId = await saveOrder({
                 cashierId: DEFAULT_ADMIN_UID,
@@ -266,81 +290,220 @@ export default function TicketPage() {
                     </p>
                 )}
                 {method === 'pos' && (
-                    <p className="text-center text-slate-400 text-xs">
-                        <span className="text-white font-bold text-base">Bs {formatBsNum(parseFloat(totalBS))}</span>
-                        <span className="mx-2"> / </span>
-                        <span className="text-slate-400">{formatUSD(totalCents)}</span>
-                    </p>
+                    <div className="space-y-3">
+                        <div>
+                            <label htmlFor="pos-ref" className="label-xs">Número de operación (opcional)</label>
+                            <input
+                                id="pos-ref"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={8}
+                                value={reference}
+                                onChange={e => setReference(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                className="input-field"
+                                placeholder="12345678"
+                            />
+                        </div>
+                        <p className="text-center text-slate-400 text-xs">
+                            <span className="text-white font-bold text-base">Bs {formatBsNum(parseFloat(totalBS))}</span>
+                            <span className="mx-2"> / </span>
+                            <span className="text-slate-400">{formatUSD(totalCents)}</span>
+                        </p>
+                    </div>
                 )}
 
                 {method === 'mixed' && (
-                    <div className="bg-[#1E293B] rounded-2xl p-4 space-y-3 border border-white/5">
-                        <p className="text-slate-400 text-xs font-semibold">Total a cubrir: <span className="text-white font-bold">Bs {formatBsNum(parseFloat(totalBS))}</span></p>
-                        {mixedPayments.map((mp, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                                <span className="text-lg shrink-0">{
-                                    mp.method === 'usd_cash' ? '💵' :
-                                    mp.method === 'bs_cash' ? '💴' :
-                                    mp.method === 'pago_movil' ? '📲' : '💳'
-                                }</span>
-                                <span className="text-xs text-slate-300 font-semibold w-24 shrink-0">{
-                                    mp.method === 'usd_cash' ? 'Efectivo USD' :
-                                    mp.method === 'bs_cash' ? 'Efectivo BS' :
-                                    mp.method === 'pago_movil' ? 'Pago Móvil' : 'Punto de Venta'
-                                }</span>
-                                <div className="relative flex-1">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs">Bs</span>
-                                    <input
-                                        type="number" step="0.01" min="0"
-                                        value={mp.amount}
-                                        onChange={e => {
-                                            const next = [...mixedPayments]
-                                            next[idx] = { ...next[idx], amount: e.target.value }
-                                            setMixedPayments(next)
-                                        }}
-                                        className="w-full bg-[#0F172A] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                        placeholder="0,00"
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => setMixedPayments(prev => prev.filter((_, i) => i !== idx))}
-                                    className="shrink-0 text-slate-500 hover:text-red-400 text-lg transition-colors w-8 h-8 flex items-center justify-center"
-                                >×</button>
-                            </div>
-                        ))}
-                        <select
-                            value={newMixMethod}
-                            onChange={e => setNewMixMethod(e.target.value)}
-                            className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-3 py-2.5 text-slate-300 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                        >
-                            <option value="">+ Agregar método de pago</option>
-                            <option value="usd_cash">💵 Efectivo USD</option>
-                            <option value="bs_cash">💴 Efectivo BS</option>
-                            <option value="pago_movil">📲 Pago Móvil</option>
-                            <option value="pos">💳 Punto de Venta</option>
-                        </select>
-                        {newMixMethod && (
+                    <div className="bg-[#1E293B] rounded-2xl p-4 space-y-4 border border-white/5">
+
+                        {/* Toggle: Con USD / Sin USD */}
+                        <div className="flex gap-2 bg-[#0F172A] p-1 rounded-xl border border-white/5" role="tablist">
                             <button
-                                onClick={() => {
-                                    setMixedPayments(prev => [...prev, { method: newMixMethod, amount: '' }])
-                                    setNewMixMethod('')
-                                }}
-                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
-                            >Agregar método</button>
-                        )}
-                        {mixedPayments.length > 0 && (
-                            <div className={`rounded-xl px-4 py-3 flex justify-between items-center border ${
-                                mixedTotalCovered
-                                    ? 'bg-green-500/10 border-green-500/20'
-                                    : 'bg-amber-500/10 border-amber-500/20'
-                            }`}>
-                                <p className={`font-bold text-sm ${mixedTotalCovered ? 'text-green-400' : 'text-amber-400'}`}>
-                                    {mixedTotalCovered ? '✅ Total cubierto' : 'Restante'}
-                                </p>
-                                {!mixedTotalCovered && (
-                                    <div className="text-right">
-                                        <p className="text-amber-400 font-extrabold">Bs {formatBsNum(mixedRemainingBS)}</p>
+                                role="tab"
+                                aria-selected={mixedWithUsd}
+                                onClick={() => { setMixedWithUsd(true); setMixedSecondMethod('') }}
+                                className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${mixedWithUsd ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >💵 Con USD</button>
+                            <button
+                                role="tab"
+                                aria-selected={!mixedWithUsd}
+                                onClick={() => { setMixedWithUsd(false); setMixedSecondMethod('') }}
+                                className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${!mixedWithUsd ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                            >🔀 Sin USD</button>
+                        </div>
+
+                        {mixedWithUsd ? (
+                            <>
+                                {/* ── MODO CON USD ── */}
+                                <div>
+                                    <label htmlFor="mixed-usd" className="label-xs mb-2 flex items-center gap-2">
+                                        Paso 1 — ¿Cuánto cobras en efectivo USD?
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                        <input
+                                            id="mixed-usd"
+                                            type="number" step="0.01" min="0"
+                                            value={mixedUsdAmount}
+                                            onChange={e => {
+                                                setMixedUsdAmount(e.target.value)
+                                                setMixedSecondMethod('')
+                                            }}
+                                            className="input-field pl-8"
+                                            placeholder="0.00"
+                                        />
                                     </div>
+                                    {parseFloat(mixedUsdAmount) > 0 && (
+                                        <p className="text-right text-xs mt-1 text-slate-400">
+                                            = <span className="text-amber-400 font-bold">Bs {formatBsNum(mixedCoveredBs)}</span>
+                                        </p>
+                                    )}
+                                </div>
+
+                                {parseFloat(mixedUsdAmount) > 0 && (
+                                    <div>
+                                        <label className="label-xs mb-2 flex items-center gap-2">
+                                            Paso 2 — ¿Cómo cobras el resto?
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { id: 'pos', label: 'Punto de Venta', icon: '💳' },
+                                                { id: 'pago_movil', label: 'Pago Móvil', icon: '📲' },
+                                                { id: 'bs_cash', label: 'Efectivo BS', icon: '💴' },
+                                            ].map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    onClick={() => setMixedSecondMethod(m.id)}
+                                                    aria-pressed={mixedSecondMethod === m.id}
+                                                    className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-semibold transition-all ${
+                                                        mixedSecondMethod === m.id
+                                                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/30'
+                                                            : 'bg-[#0F172A] border-white/10 text-slate-300 hover:border-blue-500/30'
+                                                    }`}
+                                                >
+                                                    <span className="text-lg">{m.icon}</span> {m.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                {/* ── MODO SIN USD ── */}
+                                <div>
+                                    <label className="label-xs mb-2 flex items-center gap-2">
+                                        Paso 1 — ¿Qué método usas?
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                            { id: 'pago_movil', label: 'Pago Móvil', icon: '📲' },
+                                            { id: 'pos', label: 'Punto de Venta', icon: '💳' },
+                                            { id: 'bs_cash', label: 'Efectivo BS', icon: '💴' },
+                                        ].map(m => (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => { setMixedFirstMethod(m.id); setMixedSecondMethod('') }}
+                                                aria-pressed={mixedFirstMethod === m.id}
+                                                className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-semibold transition-all ${
+                                                    mixedFirstMethod === m.id
+                                                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/30'
+                                                        : 'bg-[#0F172A] border-white/10 text-slate-300 hover:border-blue-500/30'
+                                                }`}
+                                            >
+                                                <span className="text-lg">{m.icon}</span> {m.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {mixedFirstMethod && (
+                                    <div>
+                                        <label htmlFor="mixed-first-amount" className="label-xs mb-2">
+                                            ¿Cuánto cobras con {mixedFirstMethod === 'pos' ? 'Punto de Venta' : mixedFirstMethod === 'pago_movil' ? 'Pago Móvil' : 'Efectivo BS'}?
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Bs</span>
+                                            <input
+                                                id="mixed-first-amount"
+                                                type="number" step="0.01" min="0"
+                                                value={mixedFirstAmount}
+                                                onChange={e => setMixedFirstAmount(e.target.value)}
+                                                className="input-field pl-10"
+                                                placeholder="0,00"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {mixedFirstMethod && parseFloat(mixedFirstAmount) > 0 && (
+                                    <div>
+                                        <label className="label-xs mb-2 flex items-center gap-2">
+                                            Paso 2 — ¿Cómo cobras el resto?
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {[
+                                                { id: 'pago_movil', label: 'Pago Móvil', icon: '📲' },
+                                                { id: 'pos', label: 'Punto de Venta', icon: '💳' },
+                                                { id: 'bs_cash', label: 'Efectivo BS', icon: '💴' },
+                                            ].filter(m => m.id !== mixedFirstMethod).map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    onClick={() => setMixedSecondMethod(m.id)}
+                                                    aria-pressed={mixedSecondMethod === m.id}
+                                                    className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-semibold transition-all ${
+                                                        mixedSecondMethod === m.id
+                                                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/30'
+                                                            : 'bg-[#0F172A] border-white/10 text-slate-300 hover:border-blue-500/30'
+                                                    }`}
+                                                >
+                                                    <span className="text-lg">{m.icon}</span> {m.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* Resumen */}
+                        {((mixedWithUsd && parseFloat(mixedUsdAmount) > 0) || (!mixedWithUsd && parseFloat(mixedFirstAmount) > 0)) && mixedSecondMethod && (
+                            <div className="space-y-2">
+                                <div className="bg-[#0F172A] rounded-xl px-4 py-3 space-y-2 border border-white/5">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">Total</span>
+                                        <span className="text-white font-bold">Bs {formatBsNum(parseFloat(totalBS))}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">
+                                            {mixedWithUsd
+                                                ? '💵 Efectivo USD'
+                                                : mixedFirstMethod === 'pos' ? '💳 Punto de Venta'
+                                                : mixedFirstMethod === 'pago_movil' ? '📲 Pago Móvil'
+                                                : '💴 Efectivo BS'}
+                                        </span>
+                                        <span className="text-green-400 font-bold">
+                                            {mixedWithUsd
+                                                ? `$${parseFloat(mixedUsdAmount).toFixed(2)} ≈ Bs ${formatBsNum(mixedCoveredBs)}`
+                                                : `Bs ${formatBsNum(mixedCoveredBs)}`}
+                                        </span>
+                                    </div>
+                                    <div className="border-t border-white/5 pt-2 flex justify-between text-xs">
+                                        <span className="text-slate-400 font-semibold">
+                                            {mixedSecondMethod === 'pos' ? '💳 Punto de Venta' :
+                                             mixedSecondMethod === 'pago_movil' ? '📲 Pago Móvil' :
+                                             '💴 Efectivo BS'}
+                                        </span>
+                                        <span className={`font-extrabold ${mixedRemainingBS > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                                            {mixedRemainingBS > 0
+                                                ? `Bs ${formatBsNum(mixedRemainingBS)}`
+                                                : '✅ Cubierto'}
+                                        </span>
+                                    </div>
+                                </div>
+                                {mixedRemainingBS <= 0 && (
+                                    <p className="text-center text-green-400 text-xs font-bold">
+                                        ✅ Total cubierto{mixedWithUsd ? ' con el efectivo USD' : ''}
+                                    </p>
                                 )}
                             </div>
                         )}
@@ -349,9 +512,24 @@ export default function TicketPage() {
 
                 {/* Vuelto */}
                 {change && (
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-2xl px-4 py-3 flex justify-between items-center">
-                        <p className="text-green-400 font-bold text-sm">{change.label}</p>
-                        <p className="text-green-400 font-extrabold text-lg">{change.value}</p>
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-2xl px-4 py-3 border">
+                        {change.bsValue != null ? (
+                            <div className="flex justify-between items-center gap-4">
+                                <div>
+                                    <p className="text-green-400 font-bold text-sm">{change.label}</p>
+                                    <p className="text-slate-400 text-[10px] mt-0.5">Dar vuelto en BS</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-green-400 font-extrabold text-lg">{change.value}</p>
+                                    <p className="text-amber-400 font-bold text-xs">≈ Bs {formatBsNum(change.bsValue)}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex justify-between items-center">
+                                <p className="text-green-400 font-bold text-sm">{change.label}</p>
+                                <p className="text-green-400 font-extrabold text-lg">{change.value}</p>
+                            </div>
+                        )}
                     </div>
                 )}
                 {method === 'pago_movil' && (

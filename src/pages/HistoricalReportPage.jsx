@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useHistoricalReport } from '../hooks/useHistoricalReport'
 import { useSessions } from '../hooks/useSessions'
-import { formatUSD } from '../utils/money'
+import { formatUSD, formatBsNum, fromCents } from '../utils/money'
 import { getOrderItems, voidOrder } from '../services/orderService'
 import { useCart } from '../context/CartContext'
 import { useNav } from '../context/NavigationContext'
@@ -52,6 +52,13 @@ export default function HistoricalReportPage() {
     const byMethod = activeOrders.reduce((acc, o) => {
         const m = o.paymentMethod || 'unknown'
         acc[m] = (acc[m] || 0) + (o.totalCents || 0)
+        return acc
+    }, {})
+
+    const byMethodBS = activeOrders.reduce((acc, o) => {
+        const m = o.paymentMethod || 'unknown'
+        const bs = fromCents(o.totalCents || 0) * (o.rateAtTime || 1)
+        acc[m] = (acc[m] || 0) + bs
         return acc
     }, {})
 
@@ -118,7 +125,10 @@ export default function HistoricalReportPage() {
             dateLabel = `${new Date(dateFrom).toLocaleDateString('es-VE', { day: 'numeric', month: 'long' })} al ${new Date(dateTo).toLocaleDateString('es-VE', { day: 'numeric', month: 'long', year: 'numeric' })}`
         }
         const methodLines = Object.entries(byMethod)
-            .map(([m, cents]) => `  ${METHOD_LABELS[m] || m} — ${formatUSD(cents)}`)
+            .map(([m, cents]) => {
+                const bs = byMethodBS[m] || 0
+                return `  ${METHOD_LABELS[m] || m} — ${formatUSD(cents)} (≈ Bs ${formatBsNum(bs)})`
+            })
             .join('\n')
         const orderLines = activeOrders
             .map(o => {
@@ -254,6 +264,7 @@ export default function HistoricalReportPage() {
                             <p className="label-xs mb-2">Desglose por Método</p>
                             <div className="bg-[#1E293B] rounded-2xl overflow-hidden border border-white/5">
                                 {Object.entries(byMethod).map(([m, cents], i, arr) => {
+                                    const bs = byMethodBS[m] || 0
                                     const hasDetail = m === 'mixed'
                                     const isExpanded = expandedMethod === m
                                     return (
@@ -265,6 +276,7 @@ export default function HistoricalReportPage() {
                                                 <p className="text-slate-300 text-sm">{METHOD_LABELS[m] || m}</p>
                                                 <div className="flex items-center gap-2">
                                                     <p className="text-blue-400 font-bold text-sm">{formatUSD(cents)}</p>
+                                                    <p className="text-amber-400 font-bold text-xs">≈ Bs {formatBsNum(bs)}</p>
                                                     {hasDetail && <span className="text-slate-600 text-xs">{isExpanded ? '▲' : '▼'}</span>}
                                                 </div>
                                             </div>
